@@ -4,13 +4,11 @@ import 'package:flutter/material.dart';
 
 class WaterSphere extends StatefulWidget {
   const WaterSphere({
-    this.wobbleKey,
+    super.key,
     required this.size,
     required this.child,
-    super.key,
-  }) : super(key: wobbleKey);
+  });
 
-  final Key? wobbleKey;
   final double size;
   final Widget child;
 
