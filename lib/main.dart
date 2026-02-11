@@ -222,6 +222,7 @@ class _HydrationHomePageState extends State<HydrationHomePage>
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 GlassTapRow(
+                  progress: _progress,
                   fillAnimation: _glassFillController,
                   onTap: _addWater,
                 ),
@@ -257,18 +258,21 @@ class _HydrationHomePageState extends State<HydrationHomePage>
 
 class GlassTapRow extends StatelessWidget {
   const GlassTapRow({
+    required this.progress,
     required this.fillAnimation,
     required this.onTap,
     super.key,
   });
 
+  final double progress;
   final Animation<double> fillAnimation;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     const totalGlasses = 8;
-    final filledGlasses = (progress * totalGlasses).floor();
+    final p = progress.clamp(0.0, 1.0);
+    final filledGlasses = (p * totalGlasses).floor();
 
     return Center(
       child: Wrap(
