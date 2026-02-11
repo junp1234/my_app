@@ -3,16 +3,13 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'services/ads_service.dart';
 import 'services/notification_service.dart';
-import 'services/purchase_service.dart';
 import 'services/storage_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await NotificationService.instance.initialize();
-  await AdsService.instance.initialize();
 
   runApp(const HydrationApp());
 }
@@ -44,7 +41,6 @@ class HydrationHomePage extends StatefulWidget {
 class _HydrationHomePageState extends State<HydrationHomePage>
     with TickerProviderStateMixin {
   final StorageService _storageService = StorageService.instance;
-  final PurchaseService _purchaseService = PurchaseService.instance;
 
   int _goalMl = 2000;
   int _servingMl = 200;
@@ -66,7 +62,6 @@ class _HydrationHomePageState extends State<HydrationHomePage>
       duration: const Duration(milliseconds: 300),
     );
     _loadState();
-    _purchaseService.initialize();
   }
 
   @override
@@ -215,17 +210,6 @@ class _HydrationHomePageState extends State<HydrationHomePage>
             onPressed: _openSettings,
             icon: const Icon(Icons.tune),
           ),
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (_) => const PremiumPage(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.workspace_premium_outlined),
-          ),
         ],
       ),
       body: SafeArea(
@@ -271,7 +255,6 @@ class _HydrationHomePageState extends State<HydrationHomePage>
                 ],
               ),
             ),
-            AdsService.instance.bannerWidget(),
           ],
         ),
       ),
@@ -402,57 +385,6 @@ class DropletBurstOverlay extends StatelessWidget {
             }),
           );
         },
-      ),
-    );
-  }
-}
-
-class PremiumPage extends StatefulWidget {
-  const PremiumPage({super.key});
-
-  @override
-  State<PremiumPage> createState() => _PremiumPageState();
-}
-
-class _PremiumPageState extends State<PremiumPage> {
-  final PurchaseService _purchaseService = PurchaseService.instance;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Premium')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('✨ No Ads'),
-            const SizedBox(height: 8),
-            const Text('🌼 More characters'),
-            const SizedBox(height: 8),
-            const Text('⌚ Watch integration (future)'),
-            const SizedBox(height: 16),
-            StreamBuilder<List<String>>(
-              stream: _purchaseService.productTitles,
-              initialData: const <String>[],
-              builder: (context, snapshot) {
-                final products = snapshot.data ?? <String>[];
-                if (products.isEmpty) {
-                  return const Text('Products loading...');
-                }
-                return Text(products.join('\n'));
-              },
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => _purchaseService.buyPremiumPlaceholder(),
-                child: const Text('Start purchase flow (placeholder)'),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -45,8 +45,6 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>Hydration reminders use emoji-only notifications.</string>
 </dict>
