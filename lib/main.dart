@@ -279,33 +279,35 @@ class GlassTapRow extends StatelessWidget {
     const totalGlasses = 8;
     final filledGlasses = (progress * totalGlasses).floor();
 
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
-      children: List.generate(totalGlasses, (index) {
-        final isFilled = index < filledGlasses;
+    return Center(
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: List.generate(totalGlasses, (index) {
+          final isFilled = index < filledGlasses;
 
-        return GestureDetector(
-          onTap: onTap,
-          child: AnimatedBuilder(
-            animation: fillAnimation,
-            builder: (context, _) {
-              final dynamicFill = index == filledGlasses
-                  ? fillAnimation.value
-                  : (isFilled ? 1.0 : 0.0);
+          return GestureDetector(
+            onTap: onTap,
+            child: AnimatedBuilder(
+              animation: fillAnimation,
+              builder: (context, _) {
+                final dynamicFill = index == filledGlasses
+                    ? fillAnimation.value
+                    : (isFilled ? 1.0 : 0.0);
 
-              return SizedBox(
-                width: 34,
-                height: 48,
-                child: CustomPaint(
-                  painter: GlassPainter(fillLevel: dynamicFill),
-                ),
-              );
-            },
-          ),
-        );
-      }),
+                return SizedBox(
+                  width: 34,
+                  height: 48,
+                  child: CustomPaint(
+                    painter: GlassPainter(fillLevel: dynamicFill),
+                  ),
+                );
+              },
+            ),
+          );
+        }),
+      ),
     );
   }
 }
