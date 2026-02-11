@@ -213,29 +213,24 @@ class _HydrationHomePageState extends State<HydrationHomePage>
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            GlassTapRow(
-              progress: _progress,
-              fillAnimation: _glassFillController,
-              onTap: _addWater,
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 220,
-                    height: 220,
-                    child: CircularProgressIndicator(
-                      value: _progress,
-                      strokeWidth: 14,
-                      backgroundColor: Colors.lightBlue.shade50,
-                    ),
-                  ),
-                  Column(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                GlassTapRow(
+                  progress: _progress,
+                  fillAnimation: _glassFillController,
+                  onTap: _addWater,
+                ),
+                const SizedBox(height: 24),
+                WaterBubbleProgress(
+                  progress: _progress,
+                  dropletAnimation: _dropletController,
+                  onTap: _addWater,
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       AnimatedScale(
@@ -251,11 +246,10 @@ class _HydrationHomePageState extends State<HydrationHomePage>
                       Text('$_todayIntakeMl / $_goalMl ml'),
                     ],
                   ),
-                  DropletBurstOverlay(controller: _dropletController),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -345,6 +339,135 @@ class GlassPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant GlassPainter oldDelegate) {
     return oldDelegate.fillLevel != fillLevel;
+  }
+}
+
+class WaterBubbleProgress extends StatefulWidget {
+  const WaterBubbleProgress({
+    required this.progress,
+    required this.child,
+    required this.dropletAnimation,
+    this.onTap,
+    super.key,
+  });
+
+  final double progress;
+  final Widget child;
+  final Animation<double> dropletAnimation;
+  final VoidCallback? onTap;
+
+  @override
+  State<WaterBubbleProgress> createState() => _WaterBubbleProgressState();
+}
+
+class _WaterBubbleProgressState extends State<WaterBubbleProgress>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shakeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+    );
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  void _onTap() {
+    _shakeController
+      ..reset()
+      ..forward();
+    widget.onTap?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = widget.progress.clamp(0.0, 1.0);
+
+    return GestureDetector(
+      onTap: _onTap,
+      child: AnimatedBuilder(
+        animation: _shakeController,
+        builder: (context, _) {
+          final wobble = sin(_shakeController.value * pi * 8) *
+              (1 - _shakeController.value) *
+              5;
+
+          return Transform.translate(
+            offset: Offset(wobble, 0),
+            child: SizedBox(
+              width: 220,
+              height: 220,
+              child: ClipOval(
+                child: Stack(
+                  fit: StackFit.expand,
+                  alignment: Alignment.center,
+                  children: [
+                    Container(color: Colors.lightBlue.shade50),
+                    CustomPaint(
+                      painter: WaterBubblePainter(progress: progress),
+                    ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.lightBlue.shade300,
+                          width: 5,
+                        ),
+                      ),
+                    ),
+                    DropletBurstOverlay(controller: widget.dropletAnimation),
+                    Center(child: widget.child),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class WaterBubblePainter extends CustomPainter {
+  const WaterBubblePainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final waterTop = size.height * (1 - progress);
+
+    final waterPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.lightBlue.withOpacity(0.26);
+    canvas.drawRect(
+      Rect.fromLTWH(0, waterTop, size.width, size.height - waterTop),
+      waterPaint,
+    );
+
+    final dotsPaint = Paint()..style = PaintingStyle.fill;
+    final random = Random((progress * 1000).round() + 21);
+    const dotCount = 38;
+
+    for (var i = 0; i < dotCount; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = waterTop + random.nextDouble() * (size.height - waterTop);
+      final radius = 2 + random.nextDouble() * 6;
+      dotsPaint.color = Colors.white.withOpacity(0.18 + random.nextDouble() * 0.34);
+      canvas.drawCircle(Offset(x, y), radius, dotsPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant WaterBubblePainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
 
