@@ -408,7 +408,7 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
                     // Replace older Container/DecoratedBox inner fill with
                     // WaterSphere(size: ..., child: ...).
                     WaterSphere(
-                      wobbleKey: _waterSphereKey,
+                      key: _waterSphereKey,
                       size: 220,
                       child: const SizedBox.shrink(),
                     ),
