@@ -46,6 +46,7 @@ class _HydrationHomePageState extends State<HydrationHomePage>
   int _goalMl = 2000;
   int _servingMl = 200;
   int _todayIntakeMl = 0;
+  int _lastDrinkMl = 0;
   bool _goalCelebrated = false;
 
   late final AnimationController _dropletController;
@@ -81,15 +82,19 @@ class _HydrationHomePageState extends State<HydrationHomePage>
       _goalMl = data.goalMl;
       _servingMl = data.servingMl;
       _todayIntakeMl = data.todayIntakeMl;
+      _lastDrinkMl = data.lastDrinkMl;
       _goalCelebrated = _todayIntakeMl >= _goalMl;
     });
 
     await NotificationService.instance.schedulePeriodicDropReminder();
   }
 
-  Future<void> _addWater() async {
+  Future<void> _applyDrinkDelta({required int deltaMl, required int nextLastDrinkMl}) async {
     final before = _todayIntakeMl;
-    final updated = await _storageService.addWater(servingMl: _servingMl);
+    final update = await _storageService.applyDrinkDelta(
+      deltaMl: deltaMl,
+      nextLastDrinkMl: nextLastDrinkMl,
+    );
     if (!mounted) {
       return;
     }
@@ -102,16 +107,30 @@ class _HydrationHomePageState extends State<HydrationHomePage>
       ..forward();
 
     setState(() {
-      _todayIntakeMl = updated;
+      _todayIntakeMl = update.todayIntakeMl;
+      _lastDrinkMl = update.lastDrinkMl;
     });
 
-    final goalReachedNow = before < _goalMl && updated >= _goalMl;
+    final goalReachedNow = before < _goalMl && update.todayIntakeMl >= _goalMl;
     if (goalReachedNow && !_goalCelebrated) {
       _goalCelebrated = true;
       HapticFeedback.mediumImpact();
     } else {
       HapticFeedback.lightImpact();
     }
+  }
+
+  Future<void> _addWater() async {
+    await _applyDrinkDelta(deltaMl: _servingMl, nextLastDrinkMl: _servingMl);
+  }
+
+  Future<void> _toggleTopDrink() async {
+    if (_lastDrinkMl == 0) {
+      await _applyDrinkDelta(deltaMl: _servingMl, nextLastDrinkMl: _servingMl);
+      return;
+    }
+
+    await _applyDrinkDelta(deltaMl: -_lastDrinkMl, nextLastDrinkMl: 0);
   }
 
   double get _progress => (_todayIntakeMl / _goalMl).clamp(0, 1);
@@ -221,6 +240,12 @@ class _HydrationHomePageState extends State<HydrationHomePage>
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                DropletToggleDrinkButton(
+                  canUndo: _lastDrinkMl > 0,
+                  amountMl: _servingMl,
+                  onTap: _toggleTopDrink,
+                ),
+                const SizedBox(height: 18),
                 GlassTapRow(
                   progress: _progress,
                   fillAnimation: _glassFillController,
@@ -254,6 +279,175 @@ class _HydrationHomePageState extends State<HydrationHomePage>
       ),
     );
   }
+}
+
+class DropletToggleDrinkButton extends StatefulWidget {
+  const DropletToggleDrinkButton({
+    required this.canUndo,
+    required this.amountMl,
+    required this.onTap,
+    super.key,
+  });
+
+  final bool canUndo;
+  final int amountMl;
+  final VoidCallback onTap;
+
+  @override
+  State<DropletToggleDrinkButton> createState() =>
+      _DropletToggleDrinkButtonState();
+}
+
+class _DropletToggleDrinkButtonState extends State<DropletToggleDrinkButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 0.92)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 35,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.92, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 65,
+      ),
+    ]).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _controller
+      ..reset()
+      ..forward();
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.canUndo ? Colors.lightBlue.shade700 : Colors.lightBlue.shade500;
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final shake = sin(_controller.value * pi * 8) *
+            (1 - _controller.value) *
+            0.06;
+
+        return Transform.rotate(
+          angle: shake,
+          child: Transform.scale(
+            scale: _scale.value,
+            child: child,
+          ),
+        );
+      },
+      child: SizedBox(
+        width: 72,
+        height: 86,
+        child: ClipPath(
+          clipper: DropletClipper(),
+          child: Material(
+            color: color,
+            child: InkWell(
+              onTap: _handleTap,
+              child: Stack(
+                fit: StackFit.expand,
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.white.withOpacity(0.25),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Center(
+                    child: Text(
+                      '飲んだ',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                  if (widget.canUndo)
+                    Positioned(
+                      right: 8,
+                      top: 10,
+                      child: Icon(
+                        Icons.undo,
+                        size: 16,
+                        color: Colors.white.withOpacity(0.95),
+                      ),
+                    ),
+                  Positioned(
+                    bottom: 8,
+                    child: Text(
+                      '${widget.amountMl}ml',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DropletClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(size.width / 2, 0);
+    path.cubicTo(
+      size.width * 0.96,
+      size.height * 0.18,
+      size.width * 0.96,
+      size.height * 0.62,
+      size.width / 2,
+      size.height,
+    );
+    path.cubicTo(
+      size.width * 0.04,
+      size.height * 0.62,
+      size.width * 0.04,
+      size.height * 0.18,
+      size.width / 2,
+      0,
+    );
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class GlassTapRow extends StatelessWidget {
