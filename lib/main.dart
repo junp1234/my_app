@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
+import 'widgets/water_bubble_fill.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -409,9 +410,8 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
                   fit: StackFit.expand,
                   alignment: Alignment.center,
                   children: [
-                    Container(color: Colors.lightBlue.shade50),
-                    CustomPaint(
-                      painter: WaterBubblePainter(progress: progress),
+                    ClipOval(
+                      child: WaterBubbleFill(progress: progress),
                     ),
                     DecoratedBox(
                       decoration: BoxDecoration(
@@ -432,42 +432,6 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
         },
       ),
     );
-  }
-}
-
-class WaterBubblePainter extends CustomPainter {
-  const WaterBubblePainter({required this.progress});
-
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final waterTop = size.height * (1 - progress);
-
-    final waterPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = Colors.lightBlue.withOpacity(0.26);
-    canvas.drawRect(
-      Rect.fromLTWH(0, waterTop, size.width, size.height - waterTop),
-      waterPaint,
-    );
-
-    final dotsPaint = Paint()..style = PaintingStyle.fill;
-    final random = Random((progress * 1000).round() + 21);
-    const dotCount = 38;
-
-    for (var i = 0; i < dotCount; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = waterTop + random.nextDouble() * (size.height - waterTop);
-      final radius = 2 + random.nextDouble() * 6;
-      dotsPaint.color = Colors.white.withOpacity(0.18 + random.nextDouble() * 0.34);
-      canvas.drawCircle(Offset(x, y), radius, dotsPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant WaterBubblePainter oldDelegate) {
-    return oldDelegate.progress != progress;
   }
 }
 
