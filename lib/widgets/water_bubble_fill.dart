@@ -15,6 +15,7 @@ class WaterBubbleFill extends StatefulWidget {
     this.waveLengthFactor = 1.4,
     this.waveSpeed = 1,
     this.onTap,
+    this.enableTapGesture = false,
   });
 
   final double progress;
@@ -23,12 +24,13 @@ class WaterBubbleFill extends StatefulWidget {
   final double waveLengthFactor;
   final double waveSpeed;
   final VoidCallback? onTap;
+  final bool enableTapGesture;
 
   @override
-  State<WaterBubbleFill> createState() => _WaterBubbleFillState();
+  State<WaterBubbleFill> createState() => WaterBubbleFillState();
 }
 
-class _WaterBubbleFillState extends State<WaterBubbleFill>
+class WaterBubbleFillState extends State<WaterBubbleFill>
     with TickerProviderStateMixin {
   late final AnimationController _waveController;
   late final AnimationController _jellyController;
@@ -60,41 +62,50 @@ class _WaterBubbleFillState extends State<WaterBubbleFill>
     super.dispose();
   }
 
-  Future<void> _handleTap() async {
+  Future<void> triggerWobble() async {
     widget.onTap?.call();
     await _jellyController.forward(from: 0);
+  }
+
+  Widget _buildBubbleBody(double clampedProgress) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_waveController, _jellyAnimation]),
+      builder: (context, child) {
+        final wobbleValue = _jellyAnimation.value;
+        final scaleX = 1 + 0.04 * math.sin(wobbleValue * math.pi * 2);
+        final scaleY = 1 - 0.03 * math.sin(wobbleValue * math.pi * 2);
+
+        return Transform.scale(
+          scaleX: scaleX,
+          scaleY: scaleY,
+          child: CustomPaint(
+            painter: _WaterBubblePainter(
+              progress: clampedProgress,
+              wavePhase: _waveController.value * 2 * math.pi,
+              color: widget.color,
+              waveAmplitude: widget.waveAmplitude,
+              waveLengthFactor: widget.waveLengthFactor,
+              waveSpeed: widget.waveSpeed,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final clampedProgress = widget.progress.clamp(0.0, 1.0);
+    final bubbleBody = _buildBubbleBody(clampedProgress);
+
+    if (!widget.enableTapGesture) {
+      return bubbleBody;
+    }
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: _handleTap,
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_waveController, _jellyAnimation]),
-        builder: (context, child) {
-          final wobbleValue = _jellyAnimation.value;
-          final scaleX = 1 + 0.04 * math.sin(wobbleValue * math.pi * 2);
-          final scaleY = 1 - 0.03 * math.sin(wobbleValue * math.pi * 2);
-
-          return Transform.scale(
-            scaleX: scaleX,
-            scaleY: scaleY,
-            child: CustomPaint(
-              painter: _WaterBubblePainter(
-                progress: clampedProgress,
-                wavePhase: _waveController.value * 2 * math.pi,
-                color: widget.color,
-                waveAmplitude: widget.waveAmplitude,
-                waveLengthFactor: widget.waveLengthFactor,
-                waveSpeed: widget.waveSpeed,
-              ),
-            ),
-          );
-        },
-      ),
+      onTap: triggerWobble,
+      child: bubbleBody,
     );
   }
 }

@@ -363,6 +363,8 @@ class WaterBubbleProgress extends StatefulWidget {
 
 class _WaterBubbleProgressState extends State<WaterBubbleProgress>
     with SingleTickerProviderStateMixin {
+  final GlobalKey<WaterBubbleFillState> _bubbleFillKey =
+      GlobalKey<WaterBubbleFillState>();
   late final AnimationController _shakeController;
 
   @override
@@ -381,6 +383,7 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
   }
 
   void _onTap() {
+    _bubbleFillKey.currentState?.triggerWobble();
     _shakeController
       ..reset()
       ..forward();
@@ -411,7 +414,10 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
                   alignment: Alignment.center,
                   children: [
                     ClipOval(
-                      child: WaterBubbleFill(progress: progress),
+                      child: WaterBubbleFill(
+                        key: _bubbleFillKey,
+                        progress: progress,
+                      ),
                     ),
                     DecoratedBox(
                       decoration: BoxDecoration(
