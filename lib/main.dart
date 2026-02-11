@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
-import 'widgets/water_bubble_fill.dart';
+import 'widgets/water_sphere.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -222,13 +222,11 @@ class _HydrationHomePageState extends State<HydrationHomePage>
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 GlassTapRow(
-                  progress: _progress,
                   fillAnimation: _glassFillController,
                   onTap: _addWater,
                 ),
                 const SizedBox(height: 24),
                 WaterBubbleProgress(
-                  progress: _progress,
                   dropletAnimation: _dropletController,
                   onTap: _addWater,
                   child: Column(
@@ -259,13 +257,11 @@ class _HydrationHomePageState extends State<HydrationHomePage>
 
 class GlassTapRow extends StatelessWidget {
   const GlassTapRow({
-    required this.progress,
     required this.fillAnimation,
     required this.onTap,
     super.key,
   });
 
-  final double progress;
   final Animation<double> fillAnimation;
   final VoidCallback onTap;
 
@@ -345,14 +341,12 @@ class GlassPainter extends CustomPainter {
 
 class WaterBubbleProgress extends StatefulWidget {
   const WaterBubbleProgress({
-    required this.progress,
     required this.child,
     required this.dropletAnimation,
     this.onTap,
     super.key,
   });
 
-  final double progress;
   final Widget child;
   final Animation<double> dropletAnimation;
   final VoidCallback? onTap;
@@ -363,8 +357,8 @@ class WaterBubbleProgress extends StatefulWidget {
 
 class _WaterBubbleProgressState extends State<WaterBubbleProgress>
     with SingleTickerProviderStateMixin {
-  final GlobalKey<WaterBubbleFillState> _bubbleFillKey =
-      GlobalKey<WaterBubbleFillState>();
+  final GlobalKey<WaterSphereState> _waterSphereKey =
+      GlobalKey<WaterSphereState>();
   late final AnimationController _shakeController;
 
   @override
@@ -383,7 +377,7 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
   }
 
   void _onTap() {
-    _bubbleFillKey.currentState?.triggerWobble();
+    _waterSphereKey.currentState?.triggerWobble();
     _shakeController
       ..reset()
       ..forward();
@@ -392,8 +386,6 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
 
   @override
   Widget build(BuildContext context) {
-    final progress = widget.progress.clamp(0.0, 1.0);
-
     return GestureDetector(
       onTap: _onTap,
       child: AnimatedBuilder(
@@ -413,11 +405,12 @@ class _WaterBubbleProgressState extends State<WaterBubbleProgress>
                   fit: StackFit.expand,
                   alignment: Alignment.center,
                   children: [
-                    ClipOval(
-                      child: WaterBubbleFill(
-                        key: _bubbleFillKey,
-                        progress: progress,
-                      ),
+                    // Replace older Container/DecoratedBox inner fill with
+                    // WaterSphere(size: ..., child: ...).
+                    WaterSphere(
+                      wobbleKey: _waterSphereKey,
+                      size: 220,
+                      child: const SizedBox.shrink(),
                     ),
                     DecoratedBox(
                       decoration: BoxDecoration(
