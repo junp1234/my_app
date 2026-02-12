@@ -2,294 +2,170 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-class WaterSphere extends StatefulWidget {
+class WaterSphere extends StatelessWidget {
   const WaterSphere({
     super.key,
     required this.size,
-    required this.child,
+    required this.progress,
+    required this.ripple,
+    required this.wobble,
   });
 
   final double size;
-  final Widget child;
-
-  @override
-  State<WaterSphere> createState() => WaterSphereState();
-}
-
-class WaterSphereState extends State<WaterSphere>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _wobbleController;
-  late final Animation<double> _wobbleCurve;
-
-  @override
-  void initState() {
-    super.initState();
-    _wobbleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 650),
-    );
-    _wobbleCurve = CurvedAnimation(
-      parent: _wobbleController,
-      curve: Curves.elasticOut,
-    );
-  }
-
-  @override
-  void dispose() {
-    _wobbleController.dispose();
-    super.dispose();
-  }
-
-  Future<void> triggerWobble() async {
-    await _wobbleController.forward(from: 0);
-  }
+  final double progress;
+  final double ripple;
+  final double wobble;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: triggerWobble,
-        child: AnimatedBuilder(
-          animation: _wobbleCurve,
-          builder: (context, _) {
-            final wobble = _wobbleCurve.value;
-            final wobbleWave = math.sin(wobble * math.pi);
-            final scaleX = 1 + (0.05 * wobbleWave);
-            final scaleY = 1 - (0.04 * wobbleWave);
-
-            return Transform(
-              alignment: Alignment.center,
-              transform: Matrix4.identity()..scale(scaleX, scaleY),
-              child: ClipOval(
-                child: CustomPaint(
-                  painter: WaterSpherePainter(wobble: wobble),
-                  child: Center(child: widget.child),
-                ),
-              ),
-            );
-          },
-        ),
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _WaterSpherePainter(
+        progress: progress.clamp(0, 1),
+        ripple: ripple.clamp(0, 1),
+        wobble: wobble.clamp(0, 1),
       ),
     );
   }
 }
 
-class WaterSpherePainter extends CustomPainter {
-  WaterSpherePainter({required this.wobble});
+class _WaterSpherePainter extends CustomPainter {
+  const _WaterSpherePainter({required this.progress, required this.ripple, required this.wobble});
 
+  final double progress;
+  final double ripple;
   final double wobble;
-
-  static final List<_BubbleSeed> _bubbleSeeds = _buildBubbleSeeds();
-
-  static List<_BubbleSeed> _buildBubbleSeeds() {
-    final random = math.Random(1207);
-    return List.generate(44, (_) {
-      final x = random.nextDouble();
-      final yBias = math.pow(random.nextDouble(), 1.8).toDouble();
-      final y = yBias * 0.95;
-      final r = 0.008 + random.nextDouble() * 0.02;
-      final alpha = 0.08 + random.nextDouble() * 0.16;
-      return _BubbleSeed(x: x, y: y, radiusFactor: r, alpha: alpha);
-    });
-  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) {
-      return;
-    }
-
     final center = size.center(Offset.zero);
-    final radius = math.min(size.width, size.height) * 0.5;
+    final radius = size.shortestSide * 0.38;
     final sphereRect = Rect.fromCircle(center: center, radius: radius);
 
-    final wobbleAngle = wobble * math.pi * 2.4;
-    final shiftX = math.sin(wobbleAngle) * size.width * 0.018;
-    final shiftY = math.cos(wobbleAngle * 0.8) * size.height * 0.012;
+    final wobblePhase = math.sin(wobble * math.pi * 2.0) * 0.012;
+    final scaleX = 1 + wobblePhase;
+    final scaleY = 1 - wobblePhase * 0.85;
 
-    final basePaint = Paint()
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.scale(scaleX, scaleY);
+    canvas.translate(-center.dx, -center.dy);
+
+    final bodyBase = Paint()
       ..shader = RadialGradient(
-        center: Alignment(
-          -0.15 + (shiftX / size.width),
-          -0.25 + (shiftY / size.height),
-        ),
-        radius: 1.08,
+        center: const Alignment(-0.2, -0.28),
+        radius: 1.1,
         colors: const [
-          Color(0xB8D9F8FF),
-          Color(0xA67EDBFF),
-          Color(0x7A58C2F0),
-          Color(0x963A8CC4),
+          Color(0xFFDFF7FF),
+          Color(0xFF9CDDFE),
+          Color(0xFF58B9F6),
+          Color(0xFF3E98D8),
         ],
-        stops: const [0.0, 0.34, 0.78, 1.0],
+        stops: const [0, 0.35, 0.73, 1],
       ).createShader(sphereRect);
-    canvas.drawOval(sphereRect, basePaint);
+    canvas.drawCircle(center, radius, bodyBase);
 
-    final bottomShadePaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          const Color(0x552D77B2),
-        ],
-        stops: const [0.48, 1.0],
-      ).createShader(sphereRect);
-    canvas.drawOval(sphereRect, bottomShadePaint);
+    final waterTop = center.dy + radius - (radius * 2 * progress);
+    final fillRect = Rect.fromLTRB(center.dx - radius, waterTop, center.dx + radius, center.dy + radius);
+    if (progress > 0) {
+      canvas.save();
+      canvas.clipPath(Path()..addOval(sphereRect));
+      canvas.clipRect(fillRect);
 
-    _drawCaustics(canvas, size, wobbleAngle);
-    _drawMicroBubbles(canvas, size, shiftX, shiftY);
-    _drawSpecularHighlights(canvas, size, shiftX, shiftY);
-    _drawMembrane(canvas, sphereRect, radius);
-  }
-
-  void _drawCaustics(Canvas canvas, Size size, double wobbleAngle) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
-
-    for (var i = 0; i < 4; i++) {
-      final phase = wobbleAngle + i * 0.7;
-      final startY = size.height * (0.26 + (i * 0.14)) + math.sin(phase) * 2.5;
-      final bandHeight = size.height * (0.08 + i * 0.01);
-      final horizontalDrift = math.cos(phase * 1.25) * size.width * 0.028;
-
-      final path = Path()
-        ..moveTo(size.width * 0.1 + horizontalDrift, startY)
-        ..cubicTo(
-          size.width * 0.28 + horizontalDrift,
-          startY - bandHeight,
-          size.width * 0.52 + horizontalDrift,
-          startY + bandHeight,
-          size.width * 0.84 + horizontalDrift,
-          startY,
-        )
-        ..lineTo(size.width * 0.84 + horizontalDrift, startY + bandHeight * 0.45)
-        ..cubicTo(
-          size.width * 0.56 + horizontalDrift,
-          startY + bandHeight * 1.2,
-          size.width * 0.3 + horizontalDrift,
-          startY - bandHeight * 0.2,
-          size.width * 0.1 + horizontalDrift,
-          startY + bandHeight * 0.45,
-        )
-        ..close();
-
-      paint.color = Colors.white.withValues(alpha: 0.06 + (0.02 * (3 - i)));
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  void _drawMicroBubbles(Canvas canvas, Size size, double shiftX, double shiftY) {
-    for (final bubble in _bubbleSeeds) {
-      final bubbleX = size.width * bubble.x + (shiftX * (0.2 + bubble.y));
-      final bubbleY = size.height * bubble.y + (shiftY * (0.16 + bubble.x * 0.24));
-      final bubbleRadius = math.max(0.8, size.shortestSide * bubble.radiusFactor);
-
-      final paint = Paint()
-        ..shader = RadialGradient(
+      final waterLayer = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [
-            Colors.white.withValues(alpha: bubble.alpha),
-            Colors.white.withValues(alpha: bubble.alpha * 0.35),
-            Colors.transparent,
+            const Color(0xFFEBFAFF).withValues(alpha: 0.5),
+            const Color(0xFF79CFFE).withValues(alpha: 0.82),
+            const Color(0xFF3F9BDE).withValues(alpha: 0.95),
           ],
-          stops: const [0.0, 0.6, 1.0],
-        ).createShader(
-          Rect.fromCircle(
-            center: Offset(bubbleX, bubbleY),
-            radius: bubbleRadius,
-          ),
-        );
+          stops: const [0, 0.45, 1],
+        ).createShader(fillRect);
+      canvas.drawRect(fillRect, waterLayer);
 
-      canvas.drawCircle(Offset(bubbleX, bubbleY), bubbleRadius, paint);
+      final waveWidth = radius * (0.52 + ripple * 0.6);
+      final wavePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..color = Colors.white.withValues(alpha: (0.42 * (1 - ripple)).clamp(0, 0.42));
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(center.dx, waterTop + 3),
+          width: waveWidth,
+          height: 8 + (ripple * 12),
+        ),
+        wavePaint,
+      );
+      canvas.restore();
     }
-  }
 
-  void _drawSpecularHighlights(Canvas canvas, Size size, double shiftX, double shiftY) {
-    final primaryHighlight = Rect.fromCenter(
-      center: Offset(
-        size.width * 0.34 + shiftX * 1.3,
-        size.height * 0.27 + shiftY * 0.7,
-      ),
-      width: size.width * 0.48,
-      height: size.height * 0.24,
+    _drawRefractionBand(canvas, sphereRect, radius, 0.3, 0.54, 0.11);
+    _drawRefractionBand(canvas, sphereRect, radius, 0.42, 0.72, 0.08);
+    _drawRefractionBand(canvas, sphereRect, radius, 0.2, 0.44, 0.09);
+
+    final topHighlightRect = Rect.fromCenter(
+      center: Offset(center.dx - radius * 0.2, center.dy - radius * 0.44),
+      width: radius * 1.1,
+      height: radius * 0.44,
     );
-    final primaryPaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.35, -0.2),
-        radius: 1.0,
+    final topHighlight = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withValues(alpha: 0.82),
+          const Color(0xFFECFBFF).withValues(alpha: 0.45),
+          Colors.transparent,
+        ],
+        stops: const [0, 0.45, 1],
+      ).createShader(topHighlightRect);
+    canvas.drawOval(topHighlightRect, topHighlight);
+
+    final softShadow = Paint()
+      ..color = Colors.black.withValues(alpha: 0.08)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawCircle(center + Offset(0, radius * 0.1), radius * 0.96, softShadow);
+
+    final rim = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..shader = SweepGradient(
         colors: [
           Colors.white.withValues(alpha: 0.62),
-          const Color(0xFFEEFCFF).withValues(alpha: 0.34),
-          Colors.transparent,
+          Colors.white.withValues(alpha: 0.18),
+          Colors.white.withValues(alpha: 0.58),
         ],
-        stops: const [0.0, 0.52, 1.0],
-      ).createShader(primaryHighlight);
-    canvas.drawOval(primaryHighlight, primaryPaint);
+      ).createShader(sphereRect);
+    canvas.drawCircle(center, radius, rim);
 
-    final secondaryHighlight = Rect.fromCenter(
-      center: Offset(
-        size.width * 0.7 - shiftX * 0.9,
-        size.height * 0.2 + shiftY * 0.4,
-      ),
-      width: size.width * 0.16,
-      height: size.height * 0.095,
-    );
-    final secondaryPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.48)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
-    canvas.drawOval(secondaryHighlight, secondaryPaint);
+    canvas.restore();
   }
 
-  void _drawMembrane(Canvas canvas, Rect rect, double radius) {
-    final rimOuter = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(1.2, radius * 0.032)
-      ..shader = SweepGradient(
-        startAngle: -math.pi,
-        endAngle: math.pi,
-        colors: [
-          Colors.white.withValues(alpha: 0.48),
-          Colors.white.withValues(alpha: 0.1),
-          Colors.white.withValues(alpha: 0.42),
-        ],
-        stops: const [0.0, 0.55, 1.0],
-      ).createShader(rect);
-    canvas.drawOval(rect.deflate(rimOuter.strokeWidth * 0.5), rimOuter);
+  void _drawRefractionBand(Canvas canvas, Rect sphereRect, double radius, double startY, double endY, double alpha) {
+    final path = Path()
+      ..moveTo(sphereRect.left + radius * 0.36, sphereRect.top + radius * startY)
+      ..cubicTo(
+        sphereRect.left + radius * 0.85,
+        sphereRect.top + radius * (startY - 0.2),
+        sphereRect.left + radius * 1.2,
+        sphereRect.top + radius * (endY + 0.05),
+        sphereRect.left + radius * 1.65,
+        sphereRect.top + radius * endY,
+      );
 
-    final innerShadow = Paint()
+    final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = math.max(0.9, radius * 0.024)
-      ..shader = SweepGradient(
-        startAngle: -math.pi,
-        endAngle: math.pi,
-        colors: [
-          const Color(0x802A6A9B),
-          const Color(0x402A6A9B),
-          const Color(0x902A6A9B),
-        ],
-      ).createShader(rect);
-    canvas.drawOval(rect.deflate(rimOuter.strokeWidth + 1), innerShadow);
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = radius * 0.13
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4)
+      ..color = Colors.white.withValues(alpha: alpha);
+    canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant WaterSpherePainter oldDelegate) {
-    return oldDelegate.wobble != wobble;
+  bool shouldRepaint(covariant _WaterSpherePainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.ripple != ripple || oldDelegate.wobble != wobble;
   }
-}
-
-class _BubbleSeed {
-  const _BubbleSeed({
-    required this.x,
-    required this.y,
-    required this.radiusFactor,
-    required this.alpha,
-  });
-
-  final double x;
-  final double y;
-  final double radiusFactor;
-  final double alpha;
 }
