@@ -8,6 +8,7 @@ import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
+import '../widgets/sparkle_overlay.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 
@@ -43,8 +44,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _waterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+  late final AnimationController _fullScaleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
+  late final AnimationController _sparkleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 620));
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
+  bool _hasCelebratedFull = false;
+  double _previousProgress = 0.0;
+  bool _celebrationRippleActive = false;
 
   @override
   void initState() {
@@ -58,6 +64,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..stop();
     _shakeCtrl
+      ..reset()
+      ..stop();
+    _fullScaleCtrl
+      ..reset()
+      ..stop();
+    _sparkleCtrl
       ..reset()
       ..stop();
     debugPrint('HOME init: displayTotal=$_displayTotalMl goal=${_settings.dailyGoalMl}');
@@ -81,6 +93,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _waterCtrl.dispose();
     _rippleCtrl.dispose();
     _shakeCtrl.dispose();
+    _fullScaleCtrl.dispose();
+    _sparkleCtrl.dispose();
     super.dispose();
   }
 
@@ -115,6 +129,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _waterLevelTween = Tween<double>(begin: targetProgress, end: targetProgress);
       _waterCtrl.value = 0.0;
     }
+    _checkFullCelebration(targetProgress);
+  }
+
+  void _checkFullCelebration(double progress) {
+    if (progress >= 1.0 && _previousProgress < 1.0 && !_hasCelebratedFull) {
+      _hasCelebratedFull = true;
+      _celebrationRippleActive = true;
+      _fullScaleCtrl.forward(from: 0);
+      _sparkleCtrl.forward(from: 0);
+      HapticFeedback.mediumImpact();
+      unawaited(
+        _rippleCtrl.forward(from: 0).whenComplete(() {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _celebrationRippleActive = false;
+          });
+        }),
+      );
+    } else if (progress < 1.0) {
+      _hasCelebratedFull = false;
+      _celebrationRippleActive = false;
+    }
+    _previousProgress = progress;
+  }
+
+  double get _bounceScale {
+    final t = _fullScaleCtrl.value;
+    if (t <= 0.5) {
+      return 1.0 + (Curves.easeOutBack.transform(t / 0.5) * 0.03);
+    }
+    return 1.03 - (Curves.easeOut.transform((t - 0.5) / 0.5) * 0.03);
   }
 
   Future<void> _addWater() async {
@@ -250,6 +297,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     debugPrint('HOME build: displayTotal=$_displayTotalMl goal=$goal progress=$progress');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
+    final sparkleProgress = _sparkleCtrl.value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
     return Scaffold(
@@ -279,15 +327,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               Center(
                 child: AnimatedBuilder(
-                  animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl]),
+                  animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullScaleCtrl, _sparkleCtrl]),
                   builder: (_, __) => GestureDetector(
                     onLongPress: _resetTodayTotal,
-                    child: GlassGauge(
-                      progress: _animatedWaterLevel,
-                      rippleT: _rippleCtrl.value,
-                      shakeT: _shakeCtrl.value,
-                      tickCount: GlassGauge.defaultDotCount,
-                      dropT: _dropCtrl.value,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Transform.scale(
+                          scale: _bounceScale,
+                          child: GlassGauge(
+                            progress: _animatedWaterLevel,
+                            rippleT: _rippleCtrl.value,
+                            shakeT: _shakeCtrl.value,
+                            dropT: _dropCtrl.value,
+                            extraRippleLayer: _celebrationRippleActive,
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: SparkleOverlay(progress: sparkleProgress),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
