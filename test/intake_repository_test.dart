@@ -12,6 +12,33 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
+  test('deleteTodayEvents clears only today records', () async {
+    final dbName = 'delete_today_events_test.db';
+    final helper = DatabaseHelper(databaseName: dbName);
+    final repository = IntakeRepository(dbHelper: helper);
+
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+
+    await repository.addEvent(300, at: now.subtract(const Duration(minutes: 2)));
+    await repository.addEvent(200, at: now.subtract(const Duration(minutes: 1)));
+    await repository.addEvent(150, at: yesterday);
+
+    expect(await repository.sumTodayMl(), 500);
+    expect(await repository.getTotalForDay(yesterday), 150);
+
+    final deleted = await repository.deleteTodayEvents();
+
+    expect(deleted, 2);
+    expect(await repository.sumTodayMl(), 0);
+    expect(await repository.getTotalForDay(yesterday), 150);
+
+    final db = await helper.database;
+    await db.close();
+    final dbPath = await getDatabasesPath();
+    await deleteDatabase('$dbPath/$dbName');
+  });
+
   test('undoLatestToday removes three latest events and then returns false', () async {
     final dbName = 'undo_latest_today_test.db';
     final helper = DatabaseHelper(databaseName: dbName);

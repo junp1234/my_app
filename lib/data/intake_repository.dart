@@ -9,6 +9,12 @@ class IntakeRepository {
 
   final DatabaseHelper _dbHelper;
 
+  ({int start, int end}) _dayRange(DateTime day) {
+    final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
+    final end = DateTime(day.year, day.month, day.day + 1).millisecondsSinceEpoch;
+    return (start: start, end: end);
+  }
+
   Future<IntakeEvent> addEvent(int amountMl, {DateTime? at}) async {
     final event = IntakeEvent(id: null, timestamp: at ?? DateTime.now(), amountMl: amountMl);
     final db = await _dbHelper.database;
@@ -27,13 +33,11 @@ class IntakeRepository {
 
   Future<IntakeEvent?> fetchLatestEventToday() async {
     final db = await _dbHelper.database;
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-    final end = DateTime(now.year, now.month, now.day + 1).millisecondsSinceEpoch;
+    final range = _dayRange(DateTime.now());
     final rows = await db.query(
       'intake_events',
       where: 'timestamp >= ? AND timestamp < ?',
-      whereArgs: [start, end],
+      whereArgs: [range.start, range.end],
       orderBy: 'timestamp DESC',
       limit: 1,
     );
@@ -54,35 +58,41 @@ class IntakeRepository {
 
   Future<int> sumTodayMl() async {
     final db = await _dbHelper.database;
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-    final end = DateTime(now.year, now.month, now.day + 1).millisecondsSinceEpoch;
+    final range = _dayRange(DateTime.now());
     final rows = await db.rawQuery(
       'SELECT COALESCE(SUM(amount_ml), 0) total FROM intake_events WHERE timestamp >= ? AND timestamp < ?',
-      [start, end],
+      [range.start, range.end],
     );
     return (rows.first['total'] as int?) ?? 0;
   }
 
+  Future<int> deleteTodayEvents() async {
+    final db = await _dbHelper.database;
+    final range = _dayRange(DateTime.now());
+    return db.delete(
+      'intake_events',
+      where: 'timestamp >= ? AND timestamp < ?',
+      whereArgs: [range.start, range.end],
+    );
+  }
+
   Future<int> getTotalForDay(DateTime day) async {
     final db = await _dbHelper.database;
-    final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
-    final end = DateTime(day.year, day.month, day.day + 1).millisecondsSinceEpoch;
+    final range = _dayRange(day);
     final rows = await db.rawQuery(
       'SELECT COALESCE(SUM(amount_ml), 0) total FROM intake_events WHERE timestamp >= ? AND timestamp < ?',
-      [start, end],
+      [range.start, range.end],
     );
     return (rows.first['total'] as int?) ?? 0;
   }
 
   Future<List<IntakeEvent>> getEventsForDay(DateTime day) async {
     final db = await _dbHelper.database;
-    final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
-    final end = DateTime(day.year, day.month, day.day + 1).millisecondsSinceEpoch;
+    final range = _dayRange(day);
     final rows = await db.query(
       'intake_events',
       where: 'timestamp >= ? AND timestamp < ?',
-      whereArgs: [start, end],
+      whereArgs: [range.start, range.end],
       orderBy: 'timestamp ASC',
     );
     return rows.map(IntakeEvent.fromMap).toList();
