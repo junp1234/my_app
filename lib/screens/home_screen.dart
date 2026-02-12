@@ -59,7 +59,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  double get _progress => (_todayTotalMl / _settings.dailyGoalMl).clamp(0.0, 1.0).toDouble();
+  int get _visualMaxMl => (_settings.dailyGoalMl * 1.25).round();
+
+  double get _displayProgress => (_todayTotalMl / _visualMaxMl).clamp(0.0, 1.0).toDouble();
+
+  bool get _achieved => _todayTotalMl >= _settings.dailyGoalMl;
 
   double get _animatedWaterLevel => _waterLevelTween.transform(Curves.easeOut.transform(_waterCtrl.value));
 
@@ -72,7 +76,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    final targetProgress = (total / _settings.dailyGoalMl).clamp(0.0, 1.0).toDouble();
+    final visualMaxMl = (_settings.dailyGoalMl * 1.25).round();
+    final targetProgress = (total / visualMaxMl).clamp(0.0, 1.0).toDouble();
 
     if (animate) {
       _waterLevelTween = Tween<double>(begin: _animatedWaterLevel, end: targetProgress);
@@ -118,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     HapticFeedback.selectionClick();
     await _refreshTodayFromDb(animate: true);
-    debugPrint('undo -> total=$_todayTotalMl progress=$_progress');
+    debugPrint('undo -> total=$_todayTotalMl displayProgress=$_displayProgress achieved=$_achieved');
 
     _rippleCtrl.value = 0;
   }
