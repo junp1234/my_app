@@ -12,17 +12,29 @@ class WaterFillPainter extends CustomPainter {
   final double progress;
 
   static const double _minVisualFill = 0.0;
-  static const double _maxVisualFill = 0.82;
+  static const double _maxVisualFill = 0.92;
   static const double _innerTopPadding = 4;
   static const double _reservedHeadroomPx = 20;
+  static const double _fullThreshold = 0.999;
+
+  static bool _isFull(double progress) {
+    return progress.clamp(0.0, 1.0).toDouble() >= _fullThreshold;
+  }
 
   static double visualFillForProgress(double progress) {
     final clamped = progress.clamp(0.0, 1.0).toDouble();
+    if (_isFull(clamped)) {
+      return 1.0;
+    }
     return lerpDouble(_minVisualFill, _maxVisualFill, clamped) ?? _minVisualFill;
   }
 
   static double waterTopYForProgress(Rect innerRect, double progress) {
-    final visualFill = visualFillForProgress(progress);
+    final clamped = progress.clamp(0.0, 1.0).toDouble();
+    if (_isFull(clamped)) {
+      return innerRect.top;
+    }
+    final visualFill = visualFillForProgress(clamped);
     final bottomInnerY = innerRect.bottom;
     final topInnerY = innerRect.top;
     final minY = bottomInnerY - 6;
@@ -36,17 +48,20 @@ class WaterFillPainter extends CustomPainter {
     if (clampedProgress <= 0) {
       return;
     }
+    final isFull = _isFull(clampedProgress);
     final visualFill = visualFillForProgress(clampedProgress);
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
 
-    final curveDepth = 8 + visualFill * 4;
-    final waterPath = Path()
-      ..moveTo(innerRect.left - 2, innerRect.bottom + 2)
-      ..lineTo(innerRect.left - 2, waterTopY)
-      ..quadraticBezierTo(centerX, waterTopY + curveDepth, innerRect.right + 2, waterTopY)
-      ..lineTo(innerRect.right + 2, innerRect.bottom + 2)
-      ..close();
+    final curveDepth = isFull ? 0.0 : 8 + visualFill * 4;
+    final waterPath = isFull
+        ? (Path()..addRect(innerRect.inflate(2)))
+        : (Path()
+            ..moveTo(innerRect.left - 2, innerRect.bottom + 2)
+            ..lineTo(innerRect.left - 2, waterTopY)
+            ..quadraticBezierTo(centerX, waterTopY + curveDepth, innerRect.right + 2, waterTopY)
+            ..lineTo(innerRect.right + 2, innerRect.bottom + 2)
+            ..close());
 
     final waterRect = Rect.fromLTWH(
       innerRect.left,
@@ -79,6 +94,10 @@ class WaterFillPainter extends CustomPainter {
       ).createShader(waterRect)
       ..blendMode = BlendMode.screen;
     canvas.drawPath(waterPath.shift(const Offset(-7, 0)), refractionPaint);
+
+    if (isFull) {
+      return;
+    }
 
     final surfacePath = Path()
       ..moveTo(innerRect.left + 16, waterTopY + 1)
