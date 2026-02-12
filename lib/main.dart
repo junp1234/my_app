@@ -4,7 +4,7 @@ import 'data/intake_repository.dart';
 import 'models/app_settings.dart';
 import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
-import 'services/settings_service.dart';
+import 'services/settings_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +20,7 @@ class DropGlassApp extends StatefulWidget {
 }
 
 class _DropGlassAppState extends State<DropGlassApp> {
-  final _settingsService = SettingsService.instance;
+  final _settingsService = SettingsRepository.instance;
   final _repository = IntakeRepository();
   AppSettings? _settings;
 

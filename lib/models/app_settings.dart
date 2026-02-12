@@ -46,4 +46,30 @@ class AppSettings {
       soundEnabled: soundEnabled ?? this.soundEnabled,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is AppSettings &&
+        other.dailyGoalMl == dailyGoalMl &&
+        other.stepMl == stepMl &&
+        other.reminderEnabled == reminderEnabled &&
+        other.wakeMinutes == wakeMinutes &&
+        other.sleepMinutes == sleepMinutes &&
+        other.intervalMinutes == intervalMinutes &&
+        other.soundEnabled == soundEnabled;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        dailyGoalMl,
+        stepMl,
+        reminderEnabled,
+        wakeMinutes,
+        sleepMinutes,
+        intervalMinutes,
+        soundEnabled,
+      );
 }

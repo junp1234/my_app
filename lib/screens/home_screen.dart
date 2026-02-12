@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
-import '../services/settings_service.dart';
+import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import 'history_screen.dart';
@@ -28,7 +28,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final _settingsRepo = SettingsService.instance;
+  final _settingsRepo = SettingsRepository.instance;
 
   late AppSettings _settings;
   int _displayTotalMl = 0;
@@ -85,17 +85,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _initializeHomeState() async {
+    final loadedSettings = await _settingsRepo.load();
     final todayTotal = await widget.repository.sumTodayMl();
     if (!mounted) {
       return;
     }
+    _settings = loadedSettings;
     _todayPersistedTotalMl = todayTotal;
+    _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
+    setState(() {});
     debugPrint('HOME persisted total loaded: $_todayPersistedTotalMl (UI display remains $_displayTotalMl)');
   }
 
   double _computeProgress() {
     final goal = _settings.dailyGoalMl;
-    final effective = _displayTotalMl.clamp(0, goal);
+    final effective = math.min(_displayTotalMl, goal);
     return goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0).toDouble();
   }
 
@@ -121,19 +125,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await Future<void>.delayed(const Duration(milliseconds: 280));
     HapticFeedback.selectionClick();
 
-    debugPrint('tap step=${_settings.stepMl} goal=${_settings.dailyGoalMl} displayTotal=$_displayTotalMl');
-
-    final step = _settings.stepMl;
-    await widget.repository.addEvent(step);
+    final addMl = _settings.stepMl;
+    await widget.repository.addEvent(addMl);
     if (!mounted) {
       return;
     }
 
-    final nextTotal = _displayTotalMl + step;
+    final nextTotal = _displayTotalMl + addMl;
     final goal = _settings.dailyGoalMl;
     final effective = math.min(nextTotal, goal);
     final progress = goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0);
-    debugPrint('progress=${progress.toStringAsFixed(4)}');
+    debugPrint('tap add=$addMl displayTotal=$nextTotal goal=$goal progress=$progress');
 
     setState(() {
       _displayTotalMl = nextTotal;
@@ -173,9 +175,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _openSettings() async {
     final previousSettings = _settings;
-    await Navigator.of(context).push<AppSettings>(
+    final result = await Navigator.of(context).push<AppSettings>(
       MaterialPageRoute(builder: (_) => SettingsScreen(initial: _settings)),
     );
+    if (!mounted) {
+      return;
+    }
+    if (result != null) {
+      final askPermission = !previousSettings.reminderEnabled && result.reminderEnabled;
+      setState(() {
+        _settings = result;
+        _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
+      });
+      await widget.onSettingsChanged(result, askPermission);
+      return;
+    }
     await _reloadSettings(previousSettings: previousSettings);
   }
 
@@ -231,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final goal = _settings.dailyGoalMl;
-    final effective = _displayTotalMl.clamp(0, goal);
+    final effective = math.min(_displayTotalMl, goal);
     final double progress = goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0).toDouble();
     debugPrint('HOME build: displayTotal=$_displayTotalMl goal=$goal progress=$progress');
 
