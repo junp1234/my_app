@@ -12,9 +12,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const _intervalMin = 15;
-  static const _intervalMax = 180;
-  static const _intervalStep = 5;
+  static const List<int> _intervalOptions = [15, 30, 45, 60, 75, 90, 105, 120];
   static const _accentBlue = Colors.lightBlue;
 
   final _settingsRepo = SettingsRepository.instance;
@@ -44,7 +42,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final intervalValue = settings.intervalMinutes.clamp(_intervalMin, _intervalMax).toDouble();
+    final nearestInterval = _intervalOptions.reduce((a, b) =>
+        (settings.intervalMinutes - a).abs() <= (settings.intervalMinutes - b).abs() ? a : b);
 
     return WillPopScope(
       onWillPop: _onWillPop,
@@ -117,21 +116,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '間隔: ${settings.intervalMinutes.clamp(_intervalMin, _intervalMax)}分',
+                      '間隔: $nearestInterval分',
                       style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
                     ),
-                    _blueSlider(
-                      Slider(
-                        min: _intervalMin.toDouble(),
-                        max: _intervalMax.toDouble(),
-                        divisions: (_intervalMax - _intervalMin) ~/ _intervalStep,
-                        value: intervalValue,
-                        onChanged: (v) {
-                          final nextMinutes = ((v / _intervalStep).round() * _intervalStep)
-                              .clamp(_intervalMin, _intervalMax);
-                          _updateSettings(settings.copyWith(intervalMinutes: nextMinutes));
-                        },
-                      ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _intervalOptions
+                          .map(
+                            (minutes) => ChoiceChip(
+                              label: Text('$minutes分'),
+                              selected: nearestInterval == minutes,
+                              onSelected: (_) => _updateSettings(settings.copyWith(intervalMinutes: minutes)),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ],
                 ),
