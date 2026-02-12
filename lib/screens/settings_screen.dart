@@ -50,9 +50,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) => setState(() => settings = settings.copyWith(dailyGoalMl: v.round())),
           )),
           _tile('stepMl', '${settings.stepMl} ml', Slider(
-            min: 100,
+            min: 50,
             max: 500,
-            divisions: 16,
+            divisions: 45,
             value: settings.stepMl.toDouble(),
             onChanged: (v) => setState(() => settings = settings.copyWith(stepMl: v.round())),
           )),
