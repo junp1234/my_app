@@ -13,4 +13,13 @@ void main() {
 
     expect(totalForLocalDay(events, DateTime(2026, 1, 11)), 320);
   });
+
+  test('returns zero when there are no events today', () {
+    final events = [
+      IntakeEvent(id: 1, timestamp: DateTime(2026, 1, 10, 20), amountMl: 300),
+      IntakeEvent(id: 2, timestamp: DateTime(2026, 1, 12, 7), amountMl: 300),
+    ];
+
+    expect(totalForLocalDay(events, DateTime(2026, 1, 11)), 0);
+  });
 }
