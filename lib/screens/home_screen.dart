@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 
 import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
-import '../models/intake_event.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import 'history_screen.dart';
@@ -30,9 +29,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AppSettings _settings;
   int _todayTotal = 0;
-  IntakeEvent? _lastEvent;
-  bool _undoVisible = false;
-  Timer? _undoTimer;
+  bool _canUndo = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
   bool _isHolding = false;
@@ -62,7 +59,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _undoTimer?.cancel();
     _holdTimer?.cancel();
     _pressCtrl.dispose();
     _dropCtrl.dispose();
@@ -74,10 +70,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _refresh() async {
     final total = await widget.repository.getTotalForDay(DateTime.now());
+    final latest = await widget.repository.fetchLatestEventToday();
     if (!mounted) {
       return;
     }
-    setState(() => _todayTotal = total);
+    setState(() {
+      _todayTotal = total;
+      _canUndo = latest != null;
+    });
   }
 
   double get _progressRaw => _todayTotal / _settings.dailyGoalMl;
@@ -96,16 +96,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final amount = _stepForLevel(level);
     final before = _progress;
-    final event = await widget.repository.addEvent(amount);
+    await widget.repository.addEvent(amount);
     final afterTotal = await widget.repository.getTotalForDay(DateTime.now());
 
     if (!mounted) {
       return;
     }
     setState(() {
-      _lastEvent = event;
       _todayTotal = afterTotal;
-      _undoVisible = true;
+      _canUndo = true;
       _fromProgress = before;
       _toProgress = _progress;
     });
@@ -113,39 +112,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _waterCtrl.forward(from: 0);
     _rippleCtrl.forward(from: 0);
     _shakeCtrl.forward(from: 0);
-
-    _undoTimer?.cancel();
-    _undoTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() => _undoVisible = false);
-      }
-    });
   }
 
   Future<void> _undo() async {
-    final last = _lastEvent;
-    if (last?.id == null || !_undoVisible) {
+    if (!_canUndo) {
       return;
     }
 
-    HapticFeedback.lightImpact();
     final before = _progress;
-    await widget.repository.deleteEvent(last!.id!);
+    final undone = await widget.repository.undoLatestToday();
+    if (!undone) {
+      return;
+    }
+
+    HapticFeedback.selectionClick();
     final afterTotal = await widget.repository.getTotalForDay(DateTime.now());
+    final latest = await widget.repository.fetchLatestEventToday();
 
     if (!mounted) {
       return;
     }
     setState(() {
       _todayTotal = afterTotal;
-      _undoVisible = false;
+      _canUndo = latest != null;
       _fromProgress = before;
       _toProgress = _progress;
-      _lastEvent = null;
     });
 
     _waterCtrl.forward(from: 0);
-    _rippleCtrl.forward(from: 0.8);
+    _rippleCtrl.value = 0;
   }
 
   Future<void> _openSettings() async {
@@ -230,27 +225,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-              if (_undoVisible)
-                Positioned(
-                  right: 20,
-                  bottom: 36,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(22),
-                      onTap: _undo,
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+              Positioned(
+                right: 20,
+                bottom: 36,
+                child: IgnorePointer(
+                  ignoring: !_canUndo,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 180),
+                    opacity: _canUndo ? 1 : 0.4,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(22),
+                        onTap: _undo,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+                          ),
+                          child: const Icon(Icons.undo_rounded, color: Color(0x88707070)),
                         ),
-                        child: const Icon(Icons.undo_rounded, color: Color(0x88707070)),
                       ),
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),

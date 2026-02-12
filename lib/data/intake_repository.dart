@@ -21,6 +21,37 @@ class IntakeRepository {
     await db.delete('intake_events', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> deleteEventById(int id) async {
+    await deleteEvent(id);
+  }
+
+  Future<IntakeEvent?> fetchLatestEventToday() async {
+    final db = await _dbHelper.database;
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final end = DateTime(now.year, now.month, now.day + 1).millisecondsSinceEpoch;
+    final rows = await db.query(
+      'intake_events',
+      where: 'timestamp >= ? AND timestamp < ?',
+      whereArgs: [start, end],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return IntakeEvent.fromMap(rows.first);
+  }
+
+  Future<bool> undoLatestToday() async {
+    final latest = await fetchLatestEventToday();
+    if (latest?.id == null) {
+      return false;
+    }
+    await deleteEventById(latest!.id!);
+    return true;
+  }
+
   Future<int> getTotalForDay(DateTime day) async {
     final db = await _dbHelper.database;
     final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
