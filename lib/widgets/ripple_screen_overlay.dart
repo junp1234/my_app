@@ -42,16 +42,21 @@ class _RippleScreenPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final origin = Offset(
+      center.dx.clamp(0.0, size.width),
+      center.dy.clamp(0.0, size.height),
+    );
     final maxR = math.sqrt((size.width * size.width) + (size.height * size.height)) * 1.05;
-    _drawRing(canvas, maxR: maxR, progress: t, alphaMultiplier: 1.0);
+    _drawRing(canvas, origin: origin, maxR: maxR, progress: t, alphaMultiplier: 1.0);
 
     const delay = 0.18;
     final t2 = ((t - delay) / (1 - delay)).clamp(0.0, 1.0);
-    _drawRing(canvas, maxR: maxR, progress: t2, alphaMultiplier: 0.65);
+    _drawRing(canvas, origin: origin, maxR: maxR, progress: t2, alphaMultiplier: 0.65);
   }
 
   void _drawRing(
     Canvas canvas, {
+    required Offset origin,
     required double maxR,
     required double progress,
     required double alphaMultiplier,
@@ -71,7 +76,7 @@ class _RippleScreenPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..color = const Color(0xFF7EC8FF).withValues(alpha: alpha);
 
-    canvas.drawCircle(center, radius, paint);
+    canvas.drawCircle(origin, radius, paint);
   }
 
   @override
