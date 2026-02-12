@@ -286,7 +286,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       progress: _animatedWaterLevel,
                       rippleT: _rippleCtrl.value,
                       shakeT: _shakeCtrl.value,
-                      tickCount: 14,
+                      tickCount: GlassGauge.defaultDotCount,
                       dropT: _dropCtrl.value,
                     ),
                   ),

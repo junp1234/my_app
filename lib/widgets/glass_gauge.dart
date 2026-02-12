@@ -8,6 +8,10 @@ import 'painters/water_fill_painter.dart';
 import 'shapes/teardrop_path.dart';
 
 class GlassGauge extends StatelessWidget {
+  static const int defaultDotCount = 24;
+  static const double dotRadius = 4.0;
+  static const double dotRingPadding = 10.0;
+
   const GlassGauge({
     super.key,
     required this.progress,
@@ -27,7 +31,9 @@ class GlassGauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeTicks = (tickCount * progress).round();
+    final glassR = size * 0.39;
+    final ringR = glassR + dotRingPadding;
+    final litCount = ((progress * tickCount).floor()).clamp(0, tickCount).toInt();
 
     return SizedBox(
       width: size,
@@ -37,14 +43,13 @@ class GlassGauge extends StatelessWidget {
         children: [
           ...List.generate(tickCount, (i) {
             final angle = -pi / 2 + i * (2 * pi / tickCount);
-            final radius = size * 0.5 + 14;
             return Transform.translate(
-              offset: Offset(cos(angle) * radius, sin(angle) * radius),
+              offset: Offset(cos(angle) * ringR, sin(angle) * ringR),
               child: Container(
-                width: 8,
-                height: 8,
+                width: dotRadius * 2,
+                height: dotRadius * 2,
                 decoration: BoxDecoration(
-                  color: i < activeTicks ? const Color(0x66A9D8FF) : const Color(0x22576473),
+                  color: i < litCount ? const Color(0x66A9D8FF) : const Color(0x22576473),
                   shape: BoxShape.circle,
                 ),
               ),
