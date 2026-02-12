@@ -40,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _dropCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 320));
   late final AnimationController _waterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 480));
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
-  late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 260));
+  late final AnimationController _wobbleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
 
   double _fromProgress = 0;
   double _toProgress = 0;
@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _settings = widget.settings;
-    for (final controller in [_pressCtrl, _dropCtrl, _waterCtrl, _rippleCtrl, _shakeCtrl]) {
+    for (final controller in [_pressCtrl, _dropCtrl, _waterCtrl, _rippleCtrl, _wobbleCtrl]) {
       controller.addListener(() {
         if (mounted) setState(() {});
       });
@@ -65,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _dropCtrl.dispose();
     _waterCtrl.dispose();
     _rippleCtrl.dispose();
-    _shakeCtrl.dispose();
+    _wobbleCtrl.dispose();
     super.dispose();
   }
 
@@ -102,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
     _waterCtrl.forward(from: 0);
     _rippleCtrl.forward(from: 0);
-    _shakeCtrl.forward(from: 0);
+    _wobbleCtrl.forward(from: 0);
 
     _undoTimer?.cancel();
     _undoTimer = Timer(const Duration(seconds: 2), () {
@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _undo() async {
     final last = _lastEvent;
     if (last?.id == null || !_undoVisible) return;
-    HapticFeedback.lightImpact();
+    HapticFeedback.selectionClick();
     final before = _progress;
     await widget.repository.deleteEvent(last!.id!);
     final afterTotal = await widget.repository.getTotalForDay(DateTime.now());
@@ -152,11 +152,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final scale = Tween(begin: 1.0, end: 0.96).animate(_pressCtrl).value;
     final dropY = Tween(begin: -100.0, end: 70.0).animate(CurvedAnimation(parent: _dropCtrl, curve: Curves.easeIn)).value;
     final dropOpacity = Tween(begin: 1.0, end: 0.2).animate(_dropCtrl).value;
-    final shakeX = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0, end: 4), weight: 25),
-      TweenSequenceItem(tween: Tween(begin: 4, end: -3), weight: 45),
-      TweenSequenceItem(tween: Tween(begin: -3, end: 0), weight: 30),
-    ]).animate(_shakeCtrl).value;
+    final wobbleValue = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0, end: 1), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 1, end: 0.55), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.55, end: 0), weight: 35),
+    ]).animate(CurvedAnimation(parent: _wobbleCtrl, curve: Curves.easeOut)).value;
 
     return Scaffold(
       body: Container(
@@ -173,13 +173,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Positioned(top: 6, left: 8, child: IconButton(onPressed: _openSettings, icon: const Icon(Icons.settings_outlined))),
               Positioned(top: 6, right: 8, child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.access_time))),
               Center(
-                child: Transform.translate(
-                  offset: Offset(shakeX, 0),
-                  child: GlassWidget(
-                    progress: easedProgress,
-                    ripple: _rippleCtrl.value,
-                    activeDots: (14 * easedProgress).round(),
-                  ),
+                child: GlassWidget(
+                  progress: easedProgress,
+                  ripple: _rippleCtrl.value,
+                  wobble: wobbleValue,
+                  activeDots: (14 * easedProgress).round(),
                 ),
               ),
               Positioned.fill(
@@ -200,10 +198,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       _holdTimer?.cancel();
                       _addWater(_holdLevel);
                     },
-                    onTap: () => _addWater(1),
+                    onTap: () => _undoVisible ? _undo() : _addWater(1),
                     child: Transform.scale(
                       scale: _isHolding ? (0.88 + (_holdLevel * 0.08)) : scale,
-                      child: const Icon(Icons.water_drop_rounded, color: Color(0xFF70BDF4), size: 84),
+                      child: _DropletCta(isUndoWindow: _undoVisible),
                     ),
                   ),
                 ),
@@ -238,4 +236,90 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+}
+
+class _DropletCta extends StatelessWidget {
+  const _DropletCta({required this.isUndoWindow});
+
+  final bool isUndoWindow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 84,
+          height: 84,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isUndoWindow
+                  ? const [Color(0xFFC7F0FF), Color(0xFF7ECFFE)]
+                  : const [Color(0xFF9FDFFF), Color(0xFF58BAF8)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF58BAF8).withValues(alpha: isUndoWindow ? 0.38 : 0.22),
+                blurRadius: isUndoWindow ? 18 : 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipPath(
+            clipper: _DropletClipper(),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.56),
+                    Colors.transparent,
+                    Colors.white.withValues(alpha: 0.06),
+                  ],
+                ),
+              ),
+              child: Icon(
+                isUndoWindow ? Icons.undo_rounded : Icons.add_rounded,
+                color: Colors.white,
+                size: 32,
+              ),
+            ),
+          ),
+        ),
+        if (isUndoWindow)
+          const Positioned(
+            right: -2,
+            top: -2,
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: Padding(
+                padding: EdgeInsets.all(2),
+                child: Icon(Icons.undo_rounded, size: 14, color: Color(0xFF62C2F7)),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DropletClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(size.width * 0.5, 0);
+    path.cubicTo(size.width * 0.22, size.height * 0.22, size.width * 0.08, size.height * 0.5, size.width * 0.18, size.height * 0.72);
+    path.cubicTo(size.width * 0.29, size.height * 0.92, size.width * 0.42, size.height, size.width * 0.5, size.height);
+    path.cubicTo(size.width * 0.58, size.height, size.width * 0.71, size.height * 0.92, size.width * 0.82, size.height * 0.72);
+    path.cubicTo(size.width * 0.92, size.height * 0.5, size.width * 0.78, size.height * 0.22, size.width * 0.5, 0);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
