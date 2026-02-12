@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -59,9 +60,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  int get _visualMaxMl => (_settings.dailyGoalMl * 1.25).round();
+  int _visualMaxMlForTotal(int totalMl) {
+    final baseMax = (_settings.dailyGoalMl * 1.25).round();
+    final dynamicMax = (totalMl / 0.92).ceil();
+    return math.max(baseMax, dynamicMax);
+  }
 
-  double get _displayProgress => (_todayTotalMl / _visualMaxMl).clamp(0.0, 1.0).toDouble();
+  double get _displayProgress => (_todayTotalMl / _visualMaxMlForTotal(_todayTotalMl)).clamp(0.0, 1.0).toDouble();
 
   bool get _achieved => _todayTotalMl >= _settings.dailyGoalMl;
 
@@ -76,8 +81,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    final visualMaxMl = (_settings.dailyGoalMl * 1.25).round();
-    final targetProgress = (total / visualMaxMl).clamp(0.0, 1.0).toDouble();
+    final targetProgress = (total / _visualMaxMlForTotal(total)).clamp(0.0, 1.0).toDouble();
 
     if (animate) {
       _waterLevelTween = Tween<double>(begin: _animatedWaterLevel, end: targetProgress);
@@ -148,6 +152,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await _refreshTodayFromDb(animate: false);
   }
 
+  Future<void> _resetTodayTotal() async {
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('今日の記録をリセットしますか？'),
+        content: const Text('今日の飲水イベントをすべて削除します。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('キャンセル')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('リセット')),
+        ],
+      ),
+    );
+
+    if (shouldReset != true) {
+      return;
+    }
+
+    await widget.repository.deleteTodayEvents();
+    HapticFeedback.mediumImpact();
+    await _refreshTodayFromDb(animate: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
@@ -173,17 +199,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Positioned(
                 top: 8,
                 right: 8,
-                child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.history)),
+                child: GestureDetector(
+                  onLongPress: _resetTodayTotal,
+                  child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.history)),
+                ),
               ),
               Center(
                 child: AnimatedBuilder(
                   animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl]),
-                  builder: (_, __) => GlassGauge(
-                    progress: _animatedWaterLevel,
-                    rippleT: _rippleCtrl.value,
-                    shakeT: _shakeCtrl.value,
-                    tickCount: 14,
-                    dropT: _dropCtrl.value,
+                  builder: (_, __) => GestureDetector(
+                    onLongPress: _resetTodayTotal,
+                    child: GlassGauge(
+                      progress: _animatedWaterLevel,
+                      rippleT: _rippleCtrl.value,
+                      shakeT: _shakeCtrl.value,
+                      tickCount: 14,
+                      dropT: _dropCtrl.value,
+                    ),
                   ),
                 ),
               ),
