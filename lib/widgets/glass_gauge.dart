@@ -2,12 +2,18 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'painters/glass_bowl_painter.dart';
+import 'painters/ripple_painter.dart';
+import 'painters/water_fill_painter.dart';
+import 'shapes/teardrop_path.dart';
+
 class GlassGauge extends StatelessWidget {
   const GlassGauge({
     super.key,
     required this.progress,
     required this.rippleT,
     required this.shakeT,
+    required this.dropT,
     required this.tickCount,
     this.size = 272,
   });
@@ -15,12 +21,12 @@ class GlassGauge extends StatelessWidget {
   final double progress;
   final double rippleT;
   final double shakeT;
+  final double dropT;
   final int tickCount;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final wobbleX = sin(shakeT * pi * 2) * (1 - shakeT) * 6;
     final activeTicks = (tickCount * progress).round();
 
     return SizedBox(
@@ -44,13 +50,14 @@ class GlassGauge extends StatelessWidget {
               ),
             );
           }),
-          Transform.translate(
-            offset: Offset(wobbleX, 0),
+          Transform.rotate(
+            angle: sin(shakeT * pi) * (1 - shakeT) * 0.015,
             child: CustomPaint(
               size: Size.square(size),
               painter: _GlassGaugePainter(
                 progress: progress,
                 rippleT: rippleT,
+                dropT: dropT,
               ),
             ),
           ),
@@ -61,142 +68,70 @@ class GlassGauge extends StatelessWidget {
 }
 
 class _GlassGaugePainter extends CustomPainter {
-  const _GlassGaugePainter({required this.progress, required this.rippleT});
+  const _GlassGaugePainter({
+    required this.progress,
+    required this.rippleT,
+    required this.dropT,
+  });
 
   final double progress;
   final double rippleT;
+  final double dropT;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = size.center(Offset.zero);
-    final r = size.width * 0.39;
-    final sphere = Rect.fromCircle(center: c, radius: r);
-
-    canvas.drawShadow(Path()..addOval(sphere.shift(const Offset(0, 6))), const Color(0x22000000), 14, false);
-
-    final glassFill = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.2, -0.35),
-        radius: 0.95,
-        colors: [
-          Colors.white.withValues(alpha: 0.36),
-          const Color(0xD9F7FAFF),
-          const Color(0x66E3EAF4),
-        ],
-      ).createShader(sphere);
-    canvas.drawCircle(c, r, glassFill);
+    final center = size.center(Offset.zero);
+    final bowlRadius = size.width * 0.39;
+    final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
+    final innerRect = outerRect.deflate(11);
 
     canvas.save();
-    final clipPath = Path()..addOval(sphere.deflate(8));
-    canvas.clipPath(clipPath);
+    canvas.clipPath(Path()..addOval(innerRect));
+    WaterFillPainter(innerRect: innerRect, progress: progress).paint(canvas, size);
 
-    final waterLevel = c.dy + r * 0.76 - (progress.clamp(0, 1) * r * 1.55);
-    final waterRect = Rect.fromLTWH(sphere.left, waterLevel - 34, sphere.width, sphere.bottom - waterLevel + 44);
+    final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
+    final rippleCenter = Offset(center.dx, waterTopY + 6);
+    RipplePainter(t: rippleT, center: rippleCenter, maxWidth: innerRect.width * 0.42).paint(canvas, size);
 
-    final waterPath = Path()
-      ..moveTo(sphere.left - 2, sphere.bottom + 2)
-      ..lineTo(sphere.left - 2, waterLevel)
-      ..quadraticBezierTo(c.dx - 44, waterLevel - 7, c.dx, waterLevel + 2)
-      ..quadraticBezierTo(c.dx + 52, waterLevel + 8, sphere.right + 2, waterLevel - 1)
-      ..lineTo(sphere.right + 2, sphere.bottom + 2)
-      ..close();
+    _paintFallingDrop(canvas, size, waterTopY);
+    canvas.restore();
 
-    final waterPaint = Paint()
+    GlassBowlPainter(outerRect: outerRect, innerRect: innerRect).paint(canvas, size);
+  }
+
+  void _paintFallingDrop(Canvas canvas, Size size, double waterTopY) {
+    if (dropT <= 0 || dropT >= 1) {
+      return;
+    }
+
+    final bowlCenter = size.center(Offset.zero);
+    final startY = bowlCenter.dy - size.height * 0.43;
+    final endY = waterTopY - 2;
+    final dropY = Tween<double>(begin: startY, end: endY).transform(Curves.easeIn.transform(dropT));
+    final opacity = 1 - Curves.easeIn.transform((dropT * 1.2).clamp(0, 1));
+
+    final dropSize = Size(size.width * 0.06, size.width * 0.09);
+    final dropRect = Rect.fromCenter(center: Offset(bowlCenter.dx, dropY), width: dropSize.width, height: dropSize.height);
+
+    final dropPath = buildTeardropPath(dropSize).shift(dropRect.topLeft);
+    final dropPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: const [
-          Color(0x88D9F3FF),
-          Color(0xCC8BDAFF),
-          Color(0xEE63B8EB),
-          Color(0xEE56A7DF),
-        ],
-      ).createShader(waterRect);
-    canvas.drawPath(waterPath, waterPaint);
-
-    final refractPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
         colors: [
-          Colors.white.withValues(alpha: 0.25),
-          Colors.transparent,
+          Colors.white.withValues(alpha: 0.65 * opacity),
+          const Color(0xCC7ACFFF).withValues(alpha: opacity),
+          const Color(0xE15FB9F1).withValues(alpha: opacity),
         ],
-      ).createShader(waterRect)
-      ..blendMode = BlendMode.screen;
-    canvas.drawPath(waterPath.shift(const Offset(-8, 0)), refractPaint);
+      ).createShader(dropRect);
+    canvas.drawPath(dropPath, dropPaint);
 
-    final surfacePaint = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          Colors.white.withValues(alpha: 0.9),
-          Colors.white.withValues(alpha: 0.14),
-        ],
-      ).createShader(Rect.fromLTWH(sphere.left, waterLevel - 2, sphere.width, 5))
-      ..strokeWidth = 2.1
-      ..style = PaintingStyle.stroke;
-
-    final surfacePath = Path()
-      ..moveTo(sphere.left + 20, waterLevel)
-      ..quadraticBezierTo(c.dx - 32, waterLevel - 4.5, c.dx, waterLevel + 1.5)
-      ..quadraticBezierTo(c.dx + 36, waterLevel + 6, sphere.right - 20, waterLevel + 1);
-    canvas.drawPath(surfacePath, surfacePaint);
-
-    if (rippleT > 0 && rippleT < 1) {
-      final rippleRadius = 10 + 42 * Curves.easeOut.transform(rippleT);
-      final alpha = (1 - rippleT) * 0.45;
-      final ripplePaint = Paint()
-        ..color = Colors.white.withValues(alpha: alpha)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8;
-      canvas.drawCircle(Offset(c.dx, waterLevel + 2), rippleRadius, ripplePaint);
-    }
-
-    canvas.restore();
-
-    final ringPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..shader = SweepGradient(
-        colors: [
-          Colors.white.withValues(alpha: 0.9),
-          const Color(0x99DCE5F1),
-          const Color(0xAAC8D4E2),
-          Colors.white.withValues(alpha: 0.7),
-        ],
-      ).createShader(sphere);
-    canvas.drawCircle(c, r, ringPaint);
-
-    final innerRingPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = Colors.white.withValues(alpha: 0.42);
-    canvas.drawCircle(c, r - 7, innerRingPaint);
-
-    final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.55)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.2
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(Rect.fromCircle(center: c.translate(-20, -24), radius: r * 0.7), pi * 1.0, pi * 0.34, false, highlightPaint);
-
-    canvas.drawArc(
-      Rect.fromCircle(center: c.translate(30, -8), radius: r * 0.54),
-      pi * 1.1,
-      pi * 0.18,
-      false,
-      highlightPaint..strokeWidth = 2,
-    );
-
-    final glossPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [Colors.white.withValues(alpha: 0.45), Colors.transparent],
-      ).createShader(Rect.fromCircle(center: c.translate(-36, -40), radius: 38));
-    canvas.drawCircle(c.translate(-36, -40), 38, glossPaint);
+    final specPaint = Paint()..color = Colors.white.withValues(alpha: 0.35 * opacity);
+    canvas.drawCircle(dropRect.center.translate(-3, -dropRect.height * 0.2), dropRect.width * 0.12, specPaint);
   }
 
   @override
   bool shouldRepaint(covariant _GlassGaugePainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.rippleT != rippleT;
+    return oldDelegate.progress != progress || oldDelegate.rippleT != rippleT || oldDelegate.dropT != dropT;
   }
 }

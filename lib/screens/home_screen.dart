@@ -7,7 +7,6 @@ import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
 import '../models/intake_event.dart';
 import '../widgets/droplet_button.dart';
-import '../widgets/falling_droplet.dart';
 import '../widgets/glass_gauge.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
@@ -200,6 +199,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   rippleT: _rippleCtrl.value,
                   shakeT: _shakeCtrl.value,
                   tickCount: 14,
+                  dropT: _dropCtrl.value,
                 ),
               ),
               Positioned.fill(
@@ -228,7 +228,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
-              if (_dropCtrl.isAnimating) FallingDroplet(t: _dropCtrl.value),
               if (_undoVisible)
                 Positioned(
                   right: 20,
