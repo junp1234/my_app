@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -28,7 +27,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AppSettings _settings;
-  int _todayTotal = 0;
+  int _todayTotalMl = 0;
   bool _canUndo = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
@@ -40,21 +39,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
 
-  double _fromProgress = 0;
-  double _toProgress = 0;
+  Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
 
   @override
   void initState() {
     super.initState();
     _settings = widget.settings;
-    for (final controller in [_pressCtrl, _dropCtrl, _waterCtrl, _rippleCtrl, _shakeCtrl]) {
-      controller.addListener(() {
-        if (mounted) {
-          setState(() {});
-        }
-      });
-    }
-    _refresh();
+    _refreshTodayFromDb(animate: false);
   }
 
   @override
@@ -68,23 +59,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<void> _refresh() async {
-    final total = await widget.repository.getTotalForDay(DateTime.now());
+  double get _progress => (_todayTotalMl / _settings.dailyGoalMl).clamp(0.0, 1.0).toDouble();
+
+  double get _animatedWaterLevel => _waterLevelTween.transform(Curves.easeOut.transform(_waterCtrl.value));
+
+  int _stepForLevel(int level) => switch (level) {1 => _settings.stepMl, 2 => _settings.stepMl * 2, _ => _settings.stepMl * 3};
+
+  Future<void> _refreshTodayFromDb({bool animate = true}) async {
+    final total = await widget.repository.sumTodayMl();
     final latest = await widget.repository.fetchLatestEventToday();
     if (!mounted) {
       return;
     }
+
+    final targetProgress = (total / _settings.dailyGoalMl).clamp(0.0, 1.0).toDouble();
+
+    if (animate) {
+      _waterLevelTween = Tween<double>(begin: _animatedWaterLevel, end: targetProgress);
+      _waterCtrl
+        ..reset()
+        ..forward();
+    } else {
+      _waterLevelTween = Tween<double>(begin: targetProgress, end: targetProgress);
+      _waterCtrl.value = 1.0;
+    }
+
     setState(() {
-      _todayTotal = total;
+      _todayTotalMl = total;
       _canUndo = latest != null;
     });
   }
-
-  double get _progressRaw => _todayTotal / _settings.dailyGoalMl;
-
-  double get _progress => _progressRaw.clamp(0.0, 1.0).toDouble();
-
-  int _stepForLevel(int level) => switch (level) {1 => _settings.stepMl, 2 => _settings.stepMl * 2, _ => _settings.stepMl * 3};
 
   Future<void> _addWater([int level = 1]) async {
     HapticFeedback.lightImpact();
@@ -95,21 +99,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HapticFeedback.selectionClick();
 
     final amount = _stepForLevel(level);
-    final before = _progress;
     await widget.repository.addEvent(amount);
-    final afterTotal = await widget.repository.getTotalForDay(DateTime.now());
+    await _refreshTodayFromDb(animate: true);
 
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _todayTotal = afterTotal;
-      _canUndo = true;
-      _fromProgress = before;
-      _toProgress = _progress;
-    });
-
-    _waterCtrl.forward(from: 0);
     _rippleCtrl.forward(from: 0);
     _shakeCtrl.forward(from: 0);
   }
@@ -119,27 +111,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    final before = _progress;
-    final undone = await widget.repository.undoLatestToday();
-    if (!undone) {
+    final ok = await widget.repository.undoLatestToday();
+    if (!ok) {
       return;
     }
 
     HapticFeedback.selectionClick();
-    final afterTotal = await widget.repository.getTotalForDay(DateTime.now());
-    final latest = await widget.repository.fetchLatestEventToday();
+    await _refreshTodayFromDb(animate: true);
+    debugPrint('undo -> total=$_todayTotalMl progress=$_progress');
 
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _todayTotal = afterTotal;
-      _canUndo = latest != null;
-      _fromProgress = before;
-      _toProgress = _progress;
-    });
-
-    _waterCtrl.forward(from: 0);
     _rippleCtrl.value = 0;
   }
 
@@ -153,20 +133,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final askPermission = !_settings.reminderEnabled && updated.reminderEnabled;
     setState(() => _settings = updated);
     await widget.onSettingsChanged(updated, askPermission);
-    await _refresh();
+    await _refreshTodayFromDb(animate: false);
   }
 
   Future<void> _openHistory() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => HistoryScreen(repository: widget.repository, settings: _settings)),
     );
+    await _refreshTodayFromDb(animate: false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final easedProgress = Tween(begin: _fromProgress, end: _toProgress).animate(CurvedAnimation(parent: _waterCtrl, curve: Curves.easeOut)).value;
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
-    final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1;
+    final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
     return Scaffold(
       body: Container(
@@ -191,12 +171,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.history)),
               ),
               Center(
-                child: GlassGauge(
-                  progress: easedProgress,
-                  rippleT: _rippleCtrl.value,
-                  shakeT: _shakeCtrl.value,
-                  tickCount: 14,
-                  dropT: _dropCtrl.value,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl]),
+                  builder: (_, __) => GlassGauge(
+                    progress: _animatedWaterLevel,
+                    rippleT: _rippleCtrl.value,
+                    shakeT: _shakeCtrl.value,
+                    tickCount: 14,
+                    dropT: _dropCtrl.value,
+                  ),
                 ),
               ),
               Positioned.fill(

@@ -23,15 +23,19 @@ void main() {
     await repository.addEvent(400, at: now.subtract(const Duration(minutes: 1)));
 
     expect(await repository.getTotalForDay(now), 900);
+    expect(await repository.sumTodayMl(), 900);
 
     expect(await repository.undoLatestToday(), isTrue);
     expect(await repository.getTotalForDay(now), 500);
+    expect(await repository.sumTodayMl(), 500);
 
     expect(await repository.undoLatestToday(), isTrue);
     expect(await repository.getTotalForDay(now), 200);
+    expect(await repository.sumTodayMl(), 200);
 
     expect(await repository.undoLatestToday(), isTrue);
     expect(await repository.getTotalForDay(now), 0);
+    expect(await repository.sumTodayMl(), 0);
 
     expect(await repository.undoLatestToday(), isFalse);
 
