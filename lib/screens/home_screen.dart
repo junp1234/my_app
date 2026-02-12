@@ -30,6 +30,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  static const double _fullProgressThreshold = 0.999999;
+
   final _settingsRepo = SettingsRepository.instance;
 
   late AppSettings _settings;
@@ -142,7 +144,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _checkFullCelebration(double progress) {
-    if (progress >= 1.0 && _previousProgress < 1.0 && !_hasCelebratedFull) {
+    final crossedToFull = _previousProgress < _fullProgressThreshold && progress >= _fullProgressThreshold;
+
+    if (crossedToFull && !_hasCelebratedFull) {
       _hasCelebratedFull = true;
       _celebrationRippleActive = true;
       _updateRippleCenter();
@@ -160,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           });
         }),
       );
-    } else if (progress < 1.0) {
+    } else if (progress < _fullProgressThreshold) {
       _hasCelebratedFull = false;
       _celebrationRippleActive = false;
     }
