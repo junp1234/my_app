@@ -10,6 +10,7 @@ import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import '../widgets/sparkle_overlay.dart';
+import '../widgets/watery_background.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 
@@ -142,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _checkFullCelebration(double progress) {
-    _backgroundTarget = progress >= 1.0 ? 1.0 : 0.0;
+    _backgroundTarget = progress == 1.0 ? 1.0 : 0.0;
 
     if (progress >= 1.0 && _previousProgress < 1.0 && !_hasCelebratedFull) {
       _hasCelebratedFull = true;
@@ -342,23 +343,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       body: Stack(
         key: _overlayKey,
         children: [
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0, end: _backgroundTarget),
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeOut,
-            builder: (_, t, __) {
-              final topColor = Color.lerp(const Color(0xFFF2F2F7), const Color(0xFFD9F2FF), t)!;
-              final bottomColor = Color.lerp(const Color(0xFFFEFEFF), const Color(0xFFBDE6FF), t)!;
-              return Container(
-                decoration: BoxDecoration(
+          Stack(
+            children: [
+              Container(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [topColor, bottomColor],
+                    colors: [
+                      Color(0xFFF2F2F7),
+                      Color(0xFFFEFEFF),
+                    ],
                   ),
                 ),
-              );
-            },
+              ),
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeOut,
+                opacity: _backgroundTarget,
+                child: const WateryBackground(),
+              ),
+            ],
           ),
           SafeArea(
             child: Stack(
