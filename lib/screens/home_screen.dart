@@ -32,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   late AppSettings _settings;
   int _displayTotalMl = 0;
+  int _todayPersistedTotalMl = 0;
   bool _canUndo = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
@@ -49,7 +50,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _settings = widget.settings;
-    _syncWaterAnimation(animate: false, targetProgress: 0.0);
+    _displayTotalMl = 0;
+    _canUndo = false;
+    _waterCtrl.value = 0.0;
+    _waterLevelTween = Tween<double>(begin: 0, end: 0);
+    _rippleCtrl
+      ..reset()
+      ..stop();
+    _shakeCtrl
+      ..reset()
+      ..stop();
+    debugPrint('HOME init: displayTotal=$_displayTotalMl goal=${_settings.dailyGoalMl}');
     unawaited(_initializeHomeState());
   }
 
@@ -78,16 +89,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _displayTotalMl = todayTotal;
-      _canUndo = _displayTotalMl > 0;
-      _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
-    });
+    _todayPersistedTotalMl = todayTotal;
+    debugPrint('HOME persisted total loaded: $_todayPersistedTotalMl (UI display remains $_displayTotalMl)');
   }
 
   double _computeProgress() {
     final goal = _settings.dailyGoalMl;
-    final effective = math.min(_displayTotalMl, goal);
+    final effective = _displayTotalMl.clamp(0, goal);
     return goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0).toDouble();
   }
 
@@ -101,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ..forward();
     } else {
       _waterLevelTween = Tween<double>(begin: targetProgress, end: targetProgress);
-      _waterCtrl.value = 1.0;
+      _waterCtrl.value = 0.0;
     }
   }
 
@@ -223,9 +231,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final goal = _settings.dailyGoalMl;
-    final effective = math.min(_displayTotalMl, goal);
-    final progress = goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0);
-    debugPrint('progress=${progress.toStringAsFixed(4)}');
+    final effective = _displayTotalMl.clamp(0, goal);
+    final double progress = goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0).toDouble();
+    debugPrint('HOME build: displayTotal=$_displayTotalMl goal=$goal progress=$progress');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
