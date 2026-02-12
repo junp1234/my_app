@@ -62,12 +62,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   double get _displayProgress {
     final goal = math.max(_settings.dailyGoalMl, 1);
-    return (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
+    final effectiveTotalForUi = math.min(_displayTotalMl, goal);
+    return (effectiveTotalForUi / goal).clamp(0.0, 1.0).toDouble();
   }
 
   double get _animatedWaterLevel => _waterLevelTween.transform(Curves.easeOut.transform(_waterCtrl.value));
-
-  int _stepForLevel(int level) => switch (level) {1 => _settings.stepMl, 2 => _settings.stepMl * 2, _ => _settings.stepMl * 3};
 
   void _syncWaterAnimation({required bool animate}) {
     final targetProgress = _displayProgress;
@@ -82,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _addWater([int level = 1]) async {
+  Future<void> _addWater() async {
     HapticFeedback.lightImpact();
     _pressCtrl.forward(from: 0);
     _dropCtrl.forward(from: 0);
@@ -90,14 +89,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await Future<void>.delayed(const Duration(milliseconds: 280));
     HapticFeedback.selectionClick();
 
-    final amount = _stepForLevel(level);
-    await widget.repository.addEvent(amount);
+    final addAmountMl = _settings.stepMl;
+    await widget.repository.addEvent(addAmountMl);
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _displayTotalMl += amount;
+      _displayTotalMl += addAmountMl;
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: true);
     });
@@ -124,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HapticFeedback.selectionClick();
 
     setState(() {
-      _displayTotalMl = (_displayTotalMl - latest.amountMl).clamp(0, _displayTotalMl).toInt();
+      _displayTotalMl = math.max(_displayTotalMl - latest.amountMl, 0);
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: true);
     });
@@ -249,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     onLongPressEnd: (_) {
                       _isHolding = false;
                       _holdTimer?.cancel();
-                      _addWater(_holdLevel);
+                      _addWater();
                     },
                   ),
                 ),
