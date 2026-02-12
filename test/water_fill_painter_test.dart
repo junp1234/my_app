@@ -5,17 +5,20 @@ import 'package:my_app/models/app_settings.dart';
 import 'package:my_app/widgets/painters/water_fill_painter.dart';
 
 void main() {
-  test('default stepMl is reduced to 150ml', () {
-    expect(AppSettings.defaults.stepMl, 150);
+  test('default stepMl remains 50ml', () {
+    expect(AppSettings.defaults.stepMl, 50);
   });
 
-  test('visual fill keeps headroom even at 100 percent progress', () {
+  test('100 percent progress fills to the very top', () {
     const innerRect = Rect.fromLTWH(0, 0, 200, 200);
 
     final fullY = WaterFillPainter.waterTopYForProgress(innerRect, 1.0);
-    final nearTopLimit = innerRect.top + 24;
 
-    expect(fullY, greaterThan(nearTopLimit));
-    expect(WaterFillPainter.visualFillForProgress(1.0), closeTo(0.82, 0.0001));
+    expect(fullY, innerRect.top);
+    expect(WaterFillPainter.visualFillForProgress(1.0), 1.0);
+  });
+
+  test('visual fill is progress-linear before full state', () {
+    expect(WaterFillPainter.visualFillForProgress(0.5), closeTo(0.5, 0.0001));
   });
 }

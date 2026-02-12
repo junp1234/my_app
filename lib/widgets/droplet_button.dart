@@ -27,75 +27,62 @@ class DropletButton extends StatelessWidget {
         child: SizedBox(
           width: 92,
           height: 108,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: 80,
-                height: 98,
-                decoration: BoxDecoration(
-                  color: const Color(0x442DA8ED),
-                  borderRadius: BorderRadius.circular(44),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0x4420A2E6),
-                      blurRadius: isPressed ? 20 : 14,
-                      offset: const Offset(0, 8),
-                    ),
+          child: ClipPath(
+            clipper: DropletClipper(),
+            child: Container(
+              width: 80,
+              height: 98,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.95),
+                    const Color(0xB8C9EEFF),
+                    const Color(0xCC7ECEFA),
+                    const Color(0xFF56B7ED),
                   ],
                 ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0x3320A2E6),
+                    blurRadius: isPressed ? 14 : 10,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              ClipPath(
-                clipper: DropletClipper(),
-                child: Container(
-                  width: 80,
-                  height: 98,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.95),
-                        const Color(0xB8C9EEFF),
-                        const Color(0xCC7ECEFA),
-                        const Color(0xFF56B7ED),
-                      ],
+              child: Stack(
+                children: [
+                  Positioned(
+                    left: 17,
+                    top: 17,
+                    child: Container(
+                      width: 24,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: RadialGradient(
+                          colors: [Colors.white.withValues(alpha: 0.75), Colors.transparent],
+                        ),
+                      ),
                     ),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.2),
                   ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 17,
-                        top: 17,
-                        child: Container(
-                          width: 24,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            gradient: RadialGradient(
-                              colors: [Colors.white.withValues(alpha: 0.75), Colors.transparent],
-                            ),
-                          ),
-                        ),
+                  Positioned(
+                    right: 14,
+                    bottom: 18,
+                    child: Container(
+                      width: 16,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: Colors.white.withValues(alpha: 0.2),
                       ),
-                      Positioned(
-                        right: 14,
-                        bottom: 18,
-                        child: Container(
-                          width: 16,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: Colors.white.withValues(alpha: 0.2),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

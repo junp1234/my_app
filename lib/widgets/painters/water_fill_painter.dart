@@ -24,7 +24,7 @@ class WaterFillPainter extends CustomPainter {
     if (_isFull(clamped)) {
       return 1.0;
     }
-    return lerpDouble(_minVisualFill, 0.92, clamped) ?? _minVisualFill;
+    return lerpDouble(_minVisualFill, 1.0, clamped) ?? _minVisualFill;
   }
 
   static double waterTopYForProgress(Rect innerRect, double progress) {

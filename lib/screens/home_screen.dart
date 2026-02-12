@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
   bool _hasCelebratedFull = false;
   double _previousProgress = 0.0;
+  double _backgroundTarget = 0.0;
   bool _celebrationRippleActive = false;
   final GlobalKey _glassKey = GlobalKey();
   final GlobalKey _overlayKey = GlobalKey();
@@ -122,8 +123,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   double _computeProgress() {
     final goal = _settings.dailyGoalMl;
-    final effective = math.min(_displayTotalMl, goal);
-    return goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0).toDouble();
+    return goal <= 0 ? 0.0 : (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
   }
 
   double get _animatedWaterLevel => _waterLevelTween.transform(Curves.easeOut.transform(_waterCtrl.value));
@@ -142,6 +142,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _checkFullCelebration(double progress) {
+    _backgroundTarget = progress >= 1.0 ? 1.0 : 0.0;
+
     if (progress >= 1.0 && _previousProgress < 1.0 && !_hasCelebratedFull) {
       _hasCelebratedFull = true;
       _celebrationRippleActive = true;
@@ -216,8 +218,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final nextTotal = _displayTotalMl + addMl;
     final goal = _settings.dailyGoalMl;
-    final effective = math.min(nextTotal, goal);
-    final progress = goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0);
+    final progress = goal <= 0 ? 0.0 : (nextTotal / goal).clamp(0.0, 1.0);
     debugPrint('tap add=$addMl displayTotal=$nextTotal goal=$goal progress=$progress');
 
     setState(() {
@@ -328,8 +329,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final goal = _settings.dailyGoalMl;
-    final effective = math.min(_displayTotalMl, goal);
-    final double progress = goal <= 0 ? 0.0 : (effective / goal).clamp(0.0, 1.0).toDouble();
+    final double progress = goal <= 0 ? 0.0 : (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
     debugPrint('HOME build: displayTotal=$_displayTotalMl goal=$goal progress=$progress');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
@@ -342,14 +342,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       body: Stack(
         key: _overlayKey,
         children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFF2F2F7), Color(0xFFFEFEFF)],
-              ),
-            ),
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: 0, end: _backgroundTarget),
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOut,
+            builder: (_, t, __) {
+              final topColor = Color.lerp(const Color(0xFFF2F2F7), const Color(0xFFD9F2FF), t)!;
+              final bottomColor = Color.lerp(const Color(0xFFFEFEFF), const Color(0xFFBDE6FF), t)!;
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [topColor, bottomColor],
+                  ),
+                ),
+              );
+            },
           ),
           SafeArea(
             child: Stack(
