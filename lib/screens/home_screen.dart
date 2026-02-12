@@ -8,6 +8,7 @@ import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
+import '../widgets/ripple_screen_overlay.dart';
 import '../widgets/sparkle_overlay.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
@@ -46,11 +47,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
   late final AnimationController _fullScaleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
   late final AnimationController _sparkleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 620));
+  late final AnimationController _fullRippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 980));
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
   bool _hasCelebratedFull = false;
   double _previousProgress = 0.0;
   bool _celebrationRippleActive = false;
+  final GlobalKey _glassKey = GlobalKey();
+  final GlobalKey _overlayKey = GlobalKey();
+  Offset? _rippleCenter;
 
   @override
   void initState() {
@@ -70,6 +75,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..stop();
     _sparkleCtrl
+      ..reset()
+      ..stop();
+    _fullRippleCtrl
       ..reset()
       ..stop();
     debugPrint('HOME init: displayTotal=$_displayTotalMl goal=${_settings.dailyGoalMl}');
@@ -95,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _shakeCtrl.dispose();
     _fullScaleCtrl.dispose();
     _sparkleCtrl.dispose();
+    _fullRippleCtrl.dispose();
     super.dispose();
   }
 
@@ -136,8 +145,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (progress >= 1.0 && _previousProgress < 1.0 && !_hasCelebratedFull) {
       _hasCelebratedFull = true;
       _celebrationRippleActive = true;
+      _updateRippleCenter();
       _fullScaleCtrl.forward(from: 0);
       _sparkleCtrl.forward(from: 0);
+      _fullRippleCtrl.forward(from: 0);
       HapticFeedback.mediumImpact();
       unawaited(
         _rippleCtrl.forward(from: 0).whenComplete(() {
@@ -154,6 +165,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _celebrationRippleActive = false;
     }
     _previousProgress = progress;
+  }
+
+  void _updateRippleCenter() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final overlayContext = _overlayKey.currentContext;
+      final glassContext = _glassKey.currentContext;
+      if (!mounted || overlayContext == null || glassContext == null) {
+        return;
+      }
+
+      final overlayBox = overlayContext.findRenderObject() as RenderBox?;
+      final glassBox = glassContext.findRenderObject() as RenderBox?;
+      if (overlayBox == null || glassBox == null) {
+        return;
+      }
+
+      final glassCenterGlobal = glassBox.localToGlobal(glassBox.size.center(Offset.zero));
+      final center = overlayBox.globalToLocal(glassCenterGlobal);
+      if (_rippleCenter == center) {
+        return;
+      }
+      setState(() {
+        _rippleCenter = center;
+      });
+    });
   }
 
   double get _bounceScale {
@@ -300,18 +336,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final sparkleProgress = _sparkleCtrl.value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
+    _updateRippleCenter();
+
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF2F2F7), Color(0xFFFEFEFF)],
+      body: Stack(
+        key: _overlayKey,
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFF2F2F7), Color(0xFFFEFEFF)],
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
+          SafeArea(
+            child: Stack(
+              children: [
               Positioned(
                 top: 8,
                 left: 8,
@@ -325,90 +367,104 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.history)),
                 ),
               ),
-              Center(
-                child: AnimatedBuilder(
-                  animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullScaleCtrl, _sparkleCtrl]),
-                  builder: (_, __) => GestureDetector(
-                    onLongPress: _resetTodayTotal,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Transform.scale(
-                          scale: _bounceScale,
-                          child: GlassGauge(
-                            progress: _animatedWaterLevel,
-                            rippleT: _rippleCtrl.value,
-                            shakeT: _shakeCtrl.value,
-                            dropT: _dropCtrl.value,
-                            extraRippleLayer: _celebrationRippleActive,
+                Center(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullScaleCtrl, _sparkleCtrl]),
+                    builder: (_, __) => GestureDetector(
+                      onLongPress: _resetTodayTotal,
+                      child: Stack(
+                        key: _glassKey,
+                        alignment: Alignment.center,
+                        children: [
+                          Transform.scale(
+                            scale: _bounceScale,
+                            child: GlassGauge(
+                              progress: _animatedWaterLevel,
+                              rippleT: _rippleCtrl.value,
+                              shakeT: _shakeCtrl.value,
+                              dropT: _dropCtrl.value,
+                              extraRippleLayer: _celebrationRippleActive,
+                            ),
                           ),
-                        ),
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: SparkleOverlay(progress: sparkleProgress),
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: SparkleOverlay(progress: sparkleProgress),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Positioned.fill(
-                child: Align(
-                  alignment: const Alignment(0, -0.73),
-                  child: DropletButton(
-                    scale: pressScale * holdScale,
-                    isPressed: _pressCtrl.isAnimating || _isHolding,
-                    onTap: _addWater,
-                    onLongPressStart: (_) {
-                      _isHolding = true;
-                      _holdLevel = 1;
-                      _holdTimer?.cancel();
-                      _holdTimer = Timer.periodic(const Duration(milliseconds: 380), (_) {
-                        if (!mounted || !_isHolding) {
-                          return;
-                        }
-                        setState(() => _holdLevel = _holdLevel == 3 ? 1 : _holdLevel + 1);
-                      });
-                    },
-                    onLongPressEnd: (_) {
-                      _isHolding = false;
-                      _holdTimer?.cancel();
-                      _addWater();
-                    },
+                Positioned.fill(
+                  child: Align(
+                    alignment: const Alignment(0, -0.73),
+                    child: DropletButton(
+                      scale: pressScale * holdScale,
+                      isPressed: _pressCtrl.isAnimating || _isHolding,
+                      onTap: _addWater,
+                      onLongPressStart: (_) {
+                        _isHolding = true;
+                        _holdLevel = 1;
+                        _holdTimer?.cancel();
+                        _holdTimer = Timer.periodic(const Duration(milliseconds: 380), (_) {
+                          if (!mounted || !_isHolding) {
+                            return;
+                          }
+                          setState(() => _holdLevel = _holdLevel == 3 ? 1 : _holdLevel + 1);
+                        });
+                      },
+                      onLongPressEnd: (_) {
+                        _isHolding = false;
+                        _holdTimer?.cancel();
+                        _addWater();
+                      },
+                    ),
                   ),
                 ),
-              ),
-              Positioned(
-                right: 20,
-                bottom: 36,
-                child: IgnorePointer(
-                  ignoring: !_canUndo,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 180),
-                    opacity: _canUndo ? 1 : 0.4,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(22),
-                        onTap: _undo,
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+                Positioned(
+                  right: 20,
+                  bottom: 36,
+                  child: IgnorePointer(
+                    ignoring: !_canUndo,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: _canUndo ? 1 : 0.4,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(22),
+                          onTap: _undo,
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.55),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+                            ),
+                            child: const Icon(Icons.undo_rounded, color: Color(0x88707070)),
                           ),
-                          child: const Icon(Icons.undo_rounded, color: Color(0x88707070)),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _fullRippleCtrl,
+                builder: (_, __) => RippleScreenOverlay(
+                  t: _fullRippleCtrl,
+                  center: _rippleCenter,
+                  enabled: _fullRippleCtrl.value > 0 && _fullRippleCtrl.value < 1,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
