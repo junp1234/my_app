@@ -8,17 +8,13 @@ import 'painters/water_fill_painter.dart';
 import 'shapes/teardrop_path.dart';
 
 class GlassGauge extends StatelessWidget {
-  static const int defaultDotCount = 24;
-  static const double dotRadius = 4.0;
-  static const double dotRingPadding = 10.0;
-
   const GlassGauge({
     super.key,
     required this.progress,
     required this.rippleT,
     required this.shakeT,
     required this.dropT,
-    required this.tickCount,
+    this.extraRippleLayer = false,
     this.size = 272,
   });
 
@@ -26,47 +22,25 @@ class GlassGauge extends StatelessWidget {
   final double rippleT;
   final double shakeT;
   final double dropT;
-  final int tickCount;
+  final bool extraRippleLayer;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final glassR = size * 0.39;
-    final ringR = glassR + dotRingPadding;
-    final litCount = ((progress * tickCount).floor()).clamp(0, tickCount).toInt();
-
     return SizedBox(
       width: size,
       height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          ...List.generate(tickCount, (i) {
-            final angle = -pi / 2 + i * (2 * pi / tickCount);
-            return Transform.translate(
-              offset: Offset(cos(angle) * ringR, sin(angle) * ringR),
-              child: Container(
-                width: dotRadius * 2,
-                height: dotRadius * 2,
-                decoration: BoxDecoration(
-                  color: i < litCount ? const Color(0x66A9D8FF) : const Color(0x22576473),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            );
-          }),
-          Transform.rotate(
-            angle: sin(shakeT * pi) * (1 - shakeT) * 0.015,
-            child: CustomPaint(
-              size: Size.square(size),
-              painter: _GlassGaugePainter(
-                progress: progress,
-                rippleT: rippleT,
-                dropT: dropT,
-              ),
-            ),
+      child: Transform.rotate(
+        angle: sin(shakeT * pi) * (1 - shakeT) * 0.015,
+        child: CustomPaint(
+          size: Size.square(size),
+          painter: _GlassGaugePainter(
+            progress: progress,
+            rippleT: rippleT,
+            dropT: dropT,
+            extraRippleLayer: extraRippleLayer,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -77,11 +51,13 @@ class _GlassGaugePainter extends CustomPainter {
     required this.progress,
     required this.rippleT,
     required this.dropT,
+    required this.extraRippleLayer,
   });
 
   final double progress;
   final double rippleT;
   final double dropT;
+  final bool extraRippleLayer;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -96,7 +72,12 @@ class _GlassGaugePainter extends CustomPainter {
 
     final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
     final rippleCenter = Offset(center.dx, waterTopY + 6);
-    RipplePainter(t: rippleT, center: rippleCenter, maxWidth: innerRect.width * 0.42).paint(canvas, size);
+    RipplePainter(
+      t: rippleT,
+      center: rippleCenter,
+      maxWidth: innerRect.width * 0.42,
+      extraLayer: extraRippleLayer,
+    ).paint(canvas, size);
 
     _paintFallingDrop(canvas, size, waterTopY);
     canvas.restore();
@@ -137,6 +118,9 @@ class _GlassGaugePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _GlassGaugePainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.rippleT != rippleT || oldDelegate.dropT != dropT;
+    return oldDelegate.progress != progress ||
+        oldDelegate.rippleT != rippleT ||
+        oldDelegate.dropT != dropT ||
+        oldDelegate.extraRippleLayer != extraRippleLayer;
   }
 }
