@@ -12,9 +12,7 @@ class WaterFillPainter extends CustomPainter {
   final double progress;
 
   static const double _minVisualFill = 0.0;
-  static const double _maxVisualFill = 0.92;
   static const double _innerTopPadding = 4;
-  static const double _reservedHeadroomPx = 20;
   static const double _fullThreshold = 0.999;
 
   static bool _isFull(double progress) {
@@ -26,7 +24,7 @@ class WaterFillPainter extends CustomPainter {
     if (_isFull(clamped)) {
       return 1.0;
     }
-    return lerpDouble(_minVisualFill, _maxVisualFill, clamped) ?? _minVisualFill;
+    return clamped;
   }
 
   static double waterTopYForProgress(Rect innerRect, double progress) {
@@ -38,7 +36,7 @@ class WaterFillPainter extends CustomPainter {
     final bottomInnerY = innerRect.bottom;
     final topInnerY = innerRect.top;
     final minY = bottomInnerY - 6;
-    final maxY = topInnerY + _innerTopPadding + _reservedHeadroomPx;
+    final maxY = topInnerY + _innerTopPadding;
     return lerpDouble(minY, maxY, visualFill) ?? minY;
   }
 
