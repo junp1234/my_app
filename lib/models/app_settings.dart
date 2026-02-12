@@ -19,7 +19,7 @@ class AppSettings {
 
   static const defaults = AppSettings(
     dailyGoalMl: 2000,
-    stepMl: 200,
+    stepMl: 150,
     reminderEnabled: false,
     wakeMinutes: 7 * 60,
     sleepMinutes: 23 * 60,

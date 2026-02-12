@@ -11,22 +11,33 @@ class WaterFillPainter extends CustomPainter {
   final Rect innerRect;
   final double progress;
 
+  static const double _minVisualFill = 0.04;
+  static const double _maxVisualFill = 0.82;
+  static const double _innerTopPadding = 4;
+  static const double _reservedHeadroomPx = 20;
+
+  static double visualFillForProgress(double progress) {
+    final clamped = progress.clamp(0.0, 1.0).toDouble();
+    return lerpDouble(_minVisualFill, _maxVisualFill, clamped) ?? _minVisualFill;
+  }
+
   static double waterTopYForProgress(Rect innerRect, double progress) {
-    final p = progress.clamp(0.0, 1.0);
+    final visualFill = visualFillForProgress(progress);
     final bottomInnerY = innerRect.bottom;
     final topInnerY = innerRect.top;
-    final minY = bottomInnerY - 8;
-    final maxY = topInnerY + 18;
-    return lerpDouble(minY, maxY, p) ?? minY;
+    final minY = bottomInnerY - 6;
+    final maxY = topInnerY + _innerTopPadding + _reservedHeadroomPx;
+    return lerpDouble(minY, maxY, visualFill) ?? minY;
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final clampedProgress = progress.clamp(0.0, 1.0);
+    final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
+    final visualFill = visualFillForProgress(clampedProgress);
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
 
-    final curveDepth = 8 + clampedProgress * 4;
+    final curveDepth = 8 + visualFill * 4;
     final waterPath = Path()
       ..moveTo(innerRect.left - 2, innerRect.bottom + 2)
       ..lineTo(innerRect.left - 2, waterTopY)
