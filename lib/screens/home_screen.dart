@@ -80,7 +80,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     setState(() => _todayTotal = total);
   }
 
-  double get _progress => (_todayTotal / _settings.dailyGoalMl).clamp(0.0, 1.0);
+  double get _progressRaw => _todayTotal / _settings.dailyGoalMl;
+
+  double get _progress => _progressRaw.clamp(0.0, 1.0).toDouble();
 
   int _stepForLevel(int level) => switch (level) {1 => _settings.stepMl, 2 => _settings.stepMl * 2, _ => _settings.stepMl * 3};
 
