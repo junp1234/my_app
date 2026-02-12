@@ -11,7 +11,7 @@ class WaterFillPainter extends CustomPainter {
   final Rect innerRect;
   final double progress;
 
-  static const double _minVisualFill = 0.04;
+  static const double _minVisualFill = 0.0;
   static const double _maxVisualFill = 0.82;
   static const double _innerTopPadding = 4;
   static const double _reservedHeadroomPx = 20;
@@ -33,6 +33,9 @@ class WaterFillPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
+    if (clampedProgress <= 0) {
+      return;
+    }
     final visualFill = visualFillForProgress(clampedProgress);
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
