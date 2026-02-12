@@ -13,14 +13,20 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
 
+  bool _initialized = false;
   bool _soundEnabled = false;
 
   Future<void> init() async {
+    if (_initialized) {
+      return;
+    }
+
     tzdata.initializeTimeZones();
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();
     await _plugin.initialize(const InitializationSettings(android: androidSettings, iOS: iosSettings));
+    _initialized = true;
   }
 
   Future<void> initialize() => init();
