@@ -12,6 +12,11 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static const _intervalMin = 15;
+  static const _intervalMax = 180;
+  static const _intervalStep = 5;
+  static const _accentBlue = Colors.lightBlue;
+
   final _settingsRepo = SettingsRepository.instance;
   late AppSettings settings = widget.initial;
 
@@ -39,6 +44,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final intervalValue = settings.intervalMinutes.clamp(_intervalMin, _intervalMax).toDouble();
+
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
@@ -52,23 +59,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _tile('dailyGoalMl', '${settings.dailyGoalMl} ml', Slider(
-              min: 1000,
-              max: 4000,
-              divisions: 30,
-              value: settings.dailyGoalMl.toDouble(),
-              onChanged: (v) => _updateSettings(settings.copyWith(dailyGoalMl: v.round())),
-            )),
-            _tile('stepMl', '${settings.stepMl} ml', Slider(
-              min: 50,
-              max: 500,
-              divisions: 45,
-              value: settings.stepMl.toDouble(),
-              onChanged: (v) => _updateSettings(settings.copyWith(stepMl: v.round())),
-            )),
+            _tile(
+              'dailyGoalMl',
+              '${settings.dailyGoalMl} ml',
+              _blueSlider(
+                Slider(
+                  min: 1000,
+                  max: 4000,
+                  divisions: 30,
+                  value: settings.dailyGoalMl.toDouble(),
+                  onChanged: (v) => _updateSettings(settings.copyWith(dailyGoalMl: v.round())),
+                ),
+              ),
+            ),
+            _tile(
+              'stepMl',
+              '${settings.stepMl} ml',
+              _blueSlider(
+                Slider(
+                  min: 50,
+                  max: 500,
+                  divisions: 45,
+                  value: settings.stepMl.toDouble(),
+                  onChanged: (v) => _updateSettings(settings.copyWith(stepMl: v.round())),
+                ),
+              ),
+            ),
             SwitchListTile(
               title: const Text('reminderEnabled'),
               value: settings.reminderEnabled,
+              activeColor: _accentBlue,
               onChanged: (v) => _updateSettings(settings.copyWith(reminderEnabled: v)),
             ),
             ListTile(
@@ -81,21 +101,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: Text('${(settings.sleepMinutes ~/ 60).toString().padLeft(2, '0')}:${(settings.sleepMinutes % 60).toString().padLeft(2, '0')}'),
               onTap: () => _pickTime(false),
             ),
-            ListTile(
-              title: const Text('intervalMinutes'),
-              trailing: DropdownButton<int>(
-                value: settings.intervalMinutes,
-                items: const [60, 90, 120].map((e) => DropdownMenuItem(value: e, child: Text('$e'))).toList(),
-                onChanged: (v) {
-                  if (v != null) {
-                    _updateSettings(settings.copyWith(intervalMinutes: v));
-                  }
-                },
+            Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: _accentBlue.withOpacity(0.45)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'intervalMinutes',
+                      style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '間隔: ${settings.intervalMinutes.clamp(_intervalMin, _intervalMax)}分',
+                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
+                    ),
+                    _blueSlider(
+                      Slider(
+                        min: _intervalMin.toDouble(),
+                        max: _intervalMax.toDouble(),
+                        divisions: (_intervalMax - _intervalMin) ~/ _intervalStep,
+                        value: intervalValue,
+                        onChanged: (v) {
+                          final nextMinutes = ((v / _intervalStep).round() * _intervalStep)
+                              .clamp(_intervalMin, _intervalMax);
+                          _updateSettings(settings.copyWith(intervalMinutes: nextMinutes));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             SwitchListTile(
               title: const Text('sound'),
               value: settings.soundEnabled,
+              activeColor: _accentBlue,
               onChanged: (v) => _updateSettings(settings.copyWith(soundEnabled: v)),
             ),
           ],
@@ -106,17 +151,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _tile(String title, String value, Widget child) {
     return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: _accentBlue.withOpacity(0.45)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(title, style: const TextStyle(color: Colors.blueGrey)),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.blue)),
             child,
           ],
         ),
       ),
+    );
+  }
+
+  Widget _blueSlider(Widget child) {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        activeTrackColor: _accentBlue,
+        thumbColor: _accentBlue,
+        overlayColor: _accentBlue.withOpacity(0.15),
+        inactiveTrackColor: _accentBlue.withOpacity(0.25),
+      ),
+      child: child,
     );
   }
 }
