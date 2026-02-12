@@ -52,6 +52,18 @@ class IntakeRepository {
     return true;
   }
 
+  Future<int> sumTodayMl() async {
+    final db = await _dbHelper.database;
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final end = DateTime(now.year, now.month, now.day + 1).millisecondsSinceEpoch;
+    final rows = await db.rawQuery(
+      'SELECT COALESCE(SUM(amount_ml), 0) total FROM intake_events WHERE timestamp >= ? AND timestamp < ?',
+      [start, end],
+    );
+    return (rows.first['total'] as int?) ?? 0;
+  }
+
   Future<int> getTotalForDay(DateTime day) async {
     final db = await _dbHelper.database;
     final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
