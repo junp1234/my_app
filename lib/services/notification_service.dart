@@ -9,7 +9,7 @@ class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
-  static const int _baseNotificationId = 100;
+  static const int _nextReminderNotificationId = 100;
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
 
@@ -32,33 +32,36 @@ class NotificationService {
   Future<void> initialize() => init();
 
   Future<bool> requestPermissionsIfNeeded() async {
+    var granted = true;
+
     final iosImplementation = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-    final granted = await iosImplementation?.requestPermissions(alert: true, badge: false, sound: false);
-    return granted ?? true;
+    final iosGranted = await iosImplementation?.requestPermissions(alert: true, badge: false, sound: true);
+    if (iosGranted != null) {
+      granted = granted && iosGranted;
+    }
+
+    final androidImplementation = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidGranted = await androidImplementation?.requestNotificationsPermission();
+    if (androidGranted != null) {
+      granted = granted && androidGranted;
+    }
+
+    return granted;
   }
 
-  Future<void> rescheduleDailyWindow({
+  Future<void> scheduleNextReminder({
     required bool enabled,
     required TimeOfDay wake,
     required TimeOfDay sleep,
     required int intervalMinutes,
   }) async {
     await cancelAll();
-    if (!enabled || intervalMinutes <= 0) return;
+    if (!enabled || intervalMinutes <= 0) {
+      return;
+    }
 
     final now = DateTime.now();
-    var wakeDateTime = _atToday(wake, now);
-    var sleepDateTime = _atToday(sleep, now);
-
-    if (!sleepDateTime.isAfter(wakeDateTime)) {
-      sleepDateTime = sleepDateTime.add(const Duration(days: 1));
-    }
-
-    if (now.isAfter(sleepDateTime)) {
-      wakeDateTime = wakeDateTime.add(const Duration(days: 1));
-      sleepDateTime = sleepDateTime.add(const Duration(days: 1));
-    }
-
+    final nextDateTime = _nextReminderDateTime(now, wake, sleep, intervalMinutes);
     final details = NotificationDetails(
       android: const AndroidNotificationDetails(
         'reminder',
@@ -69,23 +72,42 @@ class NotificationService {
       iOS: DarwinNotificationDetails(presentSound: _soundEnabled),
     );
 
-    var id = _baseNotificationId;
-    var cursor = wakeDateTime;
-    while (!cursor.isAfter(sleepDateTime)) {
+    await _plugin.zonedSchedule(
+      _nextReminderNotificationId,
+      '水を飲もう',
+      'コップ1杯の水分補給をしましょう',
+      tz.TZDateTime.from(nextDateTime, tz.local),
+      details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  DateTime _nextReminderDateTime(DateTime now, TimeOfDay wake, TimeOfDay sleep, int intervalMinutes) {
+    final wakeToday = DateTime(now.year, now.month, now.day, wake.hour, wake.minute);
+    var sleepToday = DateTime(now.year, now.month, now.day, sleep.hour, sleep.minute);
+
+    if (!sleepToday.isAfter(wakeToday)) {
+      sleepToday = sleepToday.add(const Duration(days: 1));
+    }
+
+    if (now.isBefore(wakeToday)) {
+      return wakeToday;
+    }
+
+    if (now.isAfter(sleepToday)) {
+      return wakeToday.add(const Duration(days: 1));
+    }
+
+    var cursor = wakeToday;
+    while (!cursor.isAfter(sleepToday)) {
       if (cursor.isAfter(now)) {
-        await _plugin.zonedSchedule(
-          id++,
-          '水を飲もう',
-          '',
-          tz.TZDateTime.from(cursor, tz.local),
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-          matchDateTimeComponents: null,
-        );
+        return cursor;
       }
       cursor = cursor.add(Duration(minutes: intervalMinutes));
     }
+
+    return wakeToday.add(const Duration(days: 1));
   }
 
   Future<void> cancelAll() async {
@@ -99,7 +121,7 @@ class NotificationService {
       await requestPermissionsIfNeeded();
     }
 
-    await rescheduleDailyWindow(
+    await scheduleNextReminder(
       enabled: settings.reminderEnabled,
       wake: _toTimeOfDay(settings.wakeMinutes),
       sleep: _toTimeOfDay(settings.sleepMinutes),
@@ -108,6 +130,4 @@ class NotificationService {
   }
 
   TimeOfDay _toTimeOfDay(int minutes) => TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
-
-  DateTime _atToday(TimeOfDay time, DateTime now) => DateTime(now.year, now.month, now.day, time.hour, time.minute);
 }
