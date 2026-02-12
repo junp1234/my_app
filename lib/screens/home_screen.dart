@@ -28,7 +28,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AppSettings _settings;
-  int _todayTotalMl = 0;
+  int _displayTotalMl = 0;
   bool _canUndo = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
@@ -46,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _settings = widget.settings;
-    _refreshTodayFromDb(animate: false);
+    _syncWaterAnimation(animate: false);
   }
 
   @override
@@ -60,29 +60,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  int _visualMaxMlForTotal(int totalMl) {
-    final baseMax = (_settings.dailyGoalMl * 1.25).round();
-    final dynamicMax = (totalMl / 0.92).ceil();
-    return math.max(baseMax, dynamicMax);
+  double get _displayProgress {
+    final goal = math.max(_settings.dailyGoalMl, 1);
+    return (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
   }
-
-  double get _displayProgress => (_todayTotalMl / _visualMaxMlForTotal(_todayTotalMl)).clamp(0.0, 1.0).toDouble();
-
-  bool get _achieved => _todayTotalMl >= _settings.dailyGoalMl;
 
   double get _animatedWaterLevel => _waterLevelTween.transform(Curves.easeOut.transform(_waterCtrl.value));
 
   int _stepForLevel(int level) => switch (level) {1 => _settings.stepMl, 2 => _settings.stepMl * 2, _ => _settings.stepMl * 3};
 
-  Future<void> _refreshTodayFromDb({bool animate = true}) async {
-    final total = await widget.repository.sumTodayMl();
-    final latest = await widget.repository.fetchLatestEventToday();
-    if (!mounted) {
-      return;
-    }
-
-    final targetProgress = (total / _visualMaxMlForTotal(total)).clamp(0.0, 1.0).toDouble();
-
+  void _syncWaterAnimation({required bool animate}) {
+    final targetProgress = _displayProgress;
     if (animate) {
       _waterLevelTween = Tween<double>(begin: _animatedWaterLevel, end: targetProgress);
       _waterCtrl
@@ -92,11 +80,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _waterLevelTween = Tween<double>(begin: targetProgress, end: targetProgress);
       _waterCtrl.value = 1.0;
     }
-
-    setState(() {
-      _todayTotalMl = total;
-      _canUndo = latest != null;
-    });
   }
 
   Future<void> _addWater([int level = 1]) async {
@@ -109,7 +92,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final amount = _stepForLevel(level);
     await widget.repository.addEvent(amount);
-    await _refreshTodayFromDb(animate: true);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _displayTotalMl += amount;
+      _canUndo = _displayTotalMl > 0;
+      _syncWaterAnimation(animate: true);
+    });
 
     _rippleCtrl.forward(from: 0);
     _shakeCtrl.forward(from: 0);
@@ -120,14 +111,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    final ok = await widget.repository.undoLatestToday();
-    if (!ok) {
+    final latest = await widget.repository.fetchLatestEventToday();
+    if (latest?.id == null) {
+      return;
+    }
+
+    await widget.repository.deleteEventById(latest!.id!);
+    if (!mounted) {
       return;
     }
 
     HapticFeedback.selectionClick();
-    await _refreshTodayFromDb(animate: true);
-    debugPrint('undo -> total=$_todayTotalMl displayProgress=$_displayProgress achieved=$_achieved');
+
+    setState(() {
+      _displayTotalMl = (_displayTotalMl - latest.amountMl).clamp(0, _displayTotalMl).toInt();
+      _canUndo = _displayTotalMl > 0;
+      _syncWaterAnimation(animate: true);
+    });
 
     _rippleCtrl.value = 0;
   }
@@ -140,16 +140,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
     final askPermission = !_settings.reminderEnabled && updated.reminderEnabled;
-    setState(() => _settings = updated);
+    setState(() {
+      _settings = updated;
+      _syncWaterAnimation(animate: false);
+    });
     await widget.onSettingsChanged(updated, askPermission);
-    await _refreshTodayFromDb(animate: false);
   }
 
   Future<void> _openHistory() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => HistoryScreen(repository: widget.repository, settings: _settings)),
     );
-    await _refreshTodayFromDb(animate: false);
   }
 
   Future<void> _resetTodayTotal() async {
@@ -171,7 +172,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     await widget.repository.deleteTodayEvents();
     HapticFeedback.mediumImpact();
-    await _refreshTodayFromDb(animate: true);
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _displayTotalMl = 0;
+      _canUndo = false;
+      _syncWaterAnimation(animate: true);
+    });
   }
 
   @override
