@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../services/hydration_calculator.dart';
 import '../services/profile_repository.dart';
+import '../theme/app_colors.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key, this.isFirstRun = false});
@@ -142,6 +143,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     };
   }
 
+  InputDecoration _fieldDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: AppColors.subtext),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+    );
+  }
+
+  Widget _sectionCard({required Widget child}) {
+    return Card(
+      color: Colors.white,
+      elevation: 1,
+      shadowColor: Colors.black.withOpacity(0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: child,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final liters = (_recommendedMl / 1000).toStringAsFixed(1);
@@ -149,98 +185,196 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return WillPopScope(
       onWillPop: () async => !widget.isFirstRun,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
-        body: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              TextFormField(
-                controller: _heightController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '身長 (cm)'),
-                validator: _heightValidator,
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text('プロフィール', style: TextStyle(color: AppColors.text)),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          iconTheme: const IconThemeData(color: AppColors.primary),
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: Icon(Icons.water_drop_rounded, color: AppColors.primary),
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            Positioned(
+              top: 12,
+              right: 20,
+              child: Icon(
+                Icons.water_drop_rounded,
+                size: 76,
+                color: AppColors.primary.withOpacity(0.2),
               ),
-              TextFormField(
-                controller: _weightController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: '体重 (kg)'),
-                validator: _weightValidator,
-              ),
-              TextFormField(
-                controller: _ageController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '年齢'),
-                validator: _ageValidator,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<ActivityIntensity>(
-                value: _activity,
-                decoration: const InputDecoration(labelText: '運動強度'),
-                items: ActivityIntensity.values
-                    .map(
-                      (value) => DropdownMenuItem<ActivityIntensity>(
-                        value: value,
-                        child: Text(_activityLabel(value)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value == null) {
-                    return;
-                  }
-                  setState(() {
-                    _activity = value;
-                  });
-                  _recalculate();
-                },
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('妊娠'),
-                value: _pregnant,
-                onChanged: (value) {
-                  setState(() {
-                    _pregnant = value;
-                    if (value) {
-                      _breastfeeding = false;
-                    }
-                  });
-                  _recalculate();
-                },
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('授乳'),
-                value: _breastfeeding,
-                onChanged: (value) {
-                  setState(() {
-                    _breastfeeding = value;
-                    if (value) {
-                      _pregnant = false;
-                    }
-                  });
-                  _recalculate();
-                },
-              ),
-              const SizedBox(height: 12),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    '推奨: $_recommendedMl mL/日 ($liters L)',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+            Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [
+                  _sectionCard(
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _heightController,
+                          keyboardType: TextInputType.number,
+                          decoration: _fieldDecoration('身長 (cm)'),
+                          validator: _heightValidator,
+                          style: const TextStyle(color: AppColors.text),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _weightController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: _fieldDecoration('体重 (kg)'),
+                          validator: _weightValidator,
+                          style: const TextStyle(color: AppColors.text),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _ageController,
+                          keyboardType: TextInputType.number,
+                          decoration: _fieldDecoration('年齢'),
+                          validator: _ageValidator,
+                          style: const TextStyle(color: AppColors.text),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<ActivityIntensity>(
+                          value: _activity,
+                          decoration: _fieldDecoration('運動強度'),
+                          items: ActivityIntensity.values
+                              .map(
+                                (value) => DropdownMenuItem<ActivityIntensity>(
+                                  value: value,
+                                  child: Text(_activityLabel(value), style: const TextStyle(color: AppColors.text)),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            if (value == null) {
+                              return;
+                            }
+                            setState(() {
+                              _activity = value;
+                            });
+                            _recalculate();
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  _sectionCard(
+                    child: Column(
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('妊娠', style: TextStyle(color: AppColors.text)),
+                          value: _pregnant,
+                          activeColor: AppColors.primary,
+                          onChanged: (value) {
+                            setState(() {
+                              _pregnant = value;
+                              if (value) {
+                                _breastfeeding = false;
+                              }
+                            });
+                            _recalculate();
+                          },
+                        ),
+                        const Divider(color: AppColors.border, height: 1),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('授乳', style: TextStyle(color: AppColors.text)),
+                          value: _breastfeeding,
+                          activeColor: AppColors.primary,
+                          onChanged: (value) {
+                            setState(() {
+                              _breastfeeding = value;
+                              if (value) {
+                                _pregnant = false;
+                              }
+                            });
+                            _recalculate();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _sectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('推奨', style: TextStyle(color: AppColors.subtext, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.primarySoft,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '$_recommendedMl',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const TextSpan(
+                                  text: ' mL',
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: '   ($liters L)',
+                                  style: const TextStyle(
+                                    color: AppColors.subtext,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _save,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('保存'),
+                    ),
+                  ),
+                  if (widget.isFirstRun) ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _skipForNow,
+                      child: const Text('今はスキップ', style: TextStyle(color: AppColors.primary)),
+                    ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 16),
-              FilledButton(onPressed: _save, child: const Text('保存')),
-              if (widget.isFirstRun) ...[
-                const SizedBox(height: 8),
-                TextButton(onPressed: _skipForNow, child: const Text('今はスキップ')),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
