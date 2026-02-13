@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
@@ -26,7 +27,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadSettings() async {
-    final reloaded = await _settingsRepo.load();
+    final prefs = await SharedPreferences.getInstance();
+    final reloaded = settings.copyWith(
+      dailyGoalMl: prefs.getInt('dailyGoalMl') ?? 2000,
+      stepMl: prefs.getInt('stepMl') ?? settings.stepMl,
+      reminderEnabled: prefs.getBool('reminderEnabled') ?? settings.reminderEnabled,
+    );
     if (!mounted) {
       return;
     }
@@ -51,10 +57,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _openProfile() async {
-    await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const ProfileScreen(isFirstRun: false)),
     );
-    await _loadSettings();
+    if (changed == true) {
+      await _loadSettings();
+    }
   }
 
   Future<bool> _onWillPop() async {
