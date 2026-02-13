@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user_profile.dart';
 import '../services/hydration_calculator.dart';
 import '../services/profile_repository.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.isInitialSetup = false});
+  const ProfileScreen({super.key, this.isFirstRun = false});
 
-  final bool isInitialSetup;
+  final bool isFirstRun;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -100,7 +101,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    await _repo.save(profile);
+    final recommendedMl = HydrationCalculator.calculateDailyMl(profile);
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setInt(ProfileRepository.keyHeightCm, profile.heightCm.round());
+    await prefs.setDouble(ProfileRepository.keyWeightKg, profile.weightKg);
+    await prefs.setInt(ProfileRepository.keyAge, profile.age);
+    await prefs.setString(ProfileRepository.keyActivity, _activityLabel(profile.activityIntensity));
+    await prefs.setBool(ProfileRepository.keyPregnant, profile.pregnant);
+    await prefs.setBool(ProfileRepository.keyLactating, profile.breastfeeding);
+    await prefs.setInt('profile_water_ml', recommendedMl);
+    await prefs.setInt('dailyGoalMl', recommendedMl);
+    await prefs.setBool('profile_setup_done', true);
+    await prefs.setBool('profile_setup_skipped', false);
+    print('profile save recommendedMl=$recommendedMl');
 
     if (!mounted) {
       return;
@@ -110,7 +124,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _skipForNow() async {
-    await _repo.skipInitialSetup();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('profile_setup_skipped', true);
+    print('profile skipped');
     if (!mounted) {
       return;
     }
@@ -131,7 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final liters = (_recommendedMl / 1000).toStringAsFixed(1);
 
     return WillPopScope(
-      onWillPop: () async => !widget.isInitialSetup,
+      onWillPop: () async => !widget.isFirstRun,
       child: Scaffold(
         appBar: AppBar(title: const Text('Profile')),
         body: Form(
@@ -219,7 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 16),
               FilledButton(onPressed: _save, child: const Text('保存')),
-              if (widget.isInitialSetup) ...[
+              if (widget.isFirstRun) ...[
                 const SizedBox(height: 8),
                 TextButton(onPressed: _skipForNow, child: const Text('今はスキップ')),
               ],

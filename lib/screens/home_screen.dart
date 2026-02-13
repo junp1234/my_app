@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
-import '../services/profile_repository.dart';
 import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
@@ -37,7 +37,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _displayTotalMl = 0;
   int _todayPersistedTotalMl = 0;
   bool _canUndo = false;
-  bool _initialProfilePromptHandled = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
   bool _isHolding = false;
@@ -79,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fullRippleCtrl
       ..reset()
       ..stop();
+    _loadPrefsAndMaybeShowProfile();
     debugPrint('HOME init: displayTotal=$_displayTotalMl goal=${_settings.dailyGoalMl}');
     unawaited(_initializeHomeState());
   }
@@ -115,19 +115,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _todayPersistedTotalMl = todayTotal;
     _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     setState(() {});
-    if (!_initialProfilePromptHandled) {
-      _initialProfilePromptHandled = true;
-      final shouldPrompt = await ProfileRepository.instance.shouldShowInitialSetup();
-      if (mounted && shouldPrompt) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
-            return;
-          }
-          unawaited(_openProfile(isInitialSetup: true));
-        });
-      }
-    }
     debugPrint('HOME persisted total loaded: $_todayPersistedTotalMl (UI display remains $_displayTotalMl)');
+  }
+
+  Future<void> _loadPrefsAndMaybeShowProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final done = prefs.getBool('profile_setup_done') ?? false;
+    final skipped = prefs.getBool('profile_setup_skipped') ?? false;
+    print('profile done=$done skipped=$skipped');
+
+    if (!done && !skipped && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) {
+          return;
+        }
+        await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => const ProfileScreen(isFirstRun: true)),
+        );
+        if (!mounted) {
+          return;
+        }
+        setState(() {});
+      });
+    }
   }
 
   double _computeProgress() {
@@ -267,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _openProfile({bool isInitialSetup = false}) async {
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => ProfileScreen(isInitialSetup: isInitialSetup)),
+      MaterialPageRoute(builder: (_) => ProfileScreen(isFirstRun: isInitialSetup)),
     );
     if (!mounted || saved != true) {
       return;
