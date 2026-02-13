@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
+import '../theme/app_colors.dart';
 import 'profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,7 +16,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   static const List<int> _intervalOptions = [15, 30, 45, 60, 75, 90, 105, 120];
-  static const _accentBlue = Colors.lightBlue;
 
   final _settingsRepo = SettingsRepository.instance;
   late AppSettings settings = widget.initial;
@@ -125,7 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SwitchListTile(
               title: const Text('reminderEnabled'),
               value: settings.reminderEnabled,
-              activeColor: _accentBlue,
+              activeColor: AppColors.primary,
               onChanged: (v) => _updateSettings(settings.copyWith(reminderEnabled: v)),
             ),
             ListTile(
@@ -141,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Card(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: _accentBlue.withOpacity(0.45)),
+                side: BorderSide(color: AppColors.primary.withOpacity(0.45)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -155,7 +155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       '間隔: $nearestInterval分',
-                      style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -178,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SwitchListTile(
               title: const Text('sound'),
               value: settings.soundEnabled,
-              activeColor: _accentBlue,
+              activeColor: AppColors.primary,
               onChanged: (v) => _updateSettings(settings.copyWith(soundEnabled: v)),
             ),
           ],
@@ -191,7 +191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: _accentBlue.withOpacity(0.45)),
+        side: BorderSide(color: AppColors.primary.withOpacity(0.45)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(8),
@@ -199,7 +199,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: const TextStyle(color: Colors.blueGrey)),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.blue)),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.primary)),
             child,
           ],
         ),
@@ -210,10 +210,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _blueSlider(Widget child) {
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
-        activeTrackColor: _accentBlue,
-        thumbColor: _accentBlue,
-        overlayColor: _accentBlue.withOpacity(0.15),
-        inactiveTrackColor: _accentBlue.withOpacity(0.25),
+        activeTrackColor: AppColors.primary,
+        thumbColor: AppColors.primary,
+        overlayColor: AppColors.primary.withOpacity(0.15),
+        inactiveTrackColor: AppColors.primary.withOpacity(0.25),
       ),
       child: child,
     );
