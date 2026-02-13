@@ -15,20 +15,6 @@ class _WateryBackgroundState extends State<WateryBackground> with SingleTickerPr
     duration: const Duration(seconds: 8),
   )..repeat();
 
-  late final List<_SparkleSpec> _sparkles = List<_SparkleSpec>.generate(
-    42,
-    (index) {
-      final random = math.Random(9000 + index * 31);
-      return _SparkleSpec(
-        x: random.nextDouble(),
-        y: random.nextDouble(),
-        radius: 0.7 + random.nextDouble() * 1.8,
-        phase: random.nextDouble() * math.pi * 2,
-        speed: 0.7 + random.nextDouble() * 1.1,
-      );
-    },
-  );
-
   @override
   void dispose() {
     _controller.dispose();
@@ -44,7 +30,6 @@ class _WateryBackgroundState extends State<WateryBackground> with SingleTickerPr
           child: CustomPaint(
             painter: WateryBackgroundPainter(
               t: _controller.value,
-              sparkles: _sparkles,
             ),
           ),
         ),
@@ -54,10 +39,9 @@ class _WateryBackgroundState extends State<WateryBackground> with SingleTickerPr
 }
 
 class WateryBackgroundPainter extends CustomPainter {
-  WateryBackgroundPainter({required this.t, required this.sparkles});
+  WateryBackgroundPainter({required this.t});
 
   final double t;
-  final List<_SparkleSpec> sparkles;
 
   final Paint _basePaint = Paint();
   final Paint _causticPaint = Paint()
@@ -66,7 +50,6 @@ class WateryBackgroundPainter extends CustomPainter {
   final Paint _wavePaint = Paint()
     ..style = PaintingStyle.fill
     ..color = const Color(0x140C6E8F);
-  final Paint _sparklePaint = Paint()..style = PaintingStyle.fill;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -86,7 +69,6 @@ class WateryBackgroundPainter extends CustomPainter {
 
     _paintWaveShadows(canvas, size);
     _paintCaustics(canvas, size);
-    _paintSparkles(canvas, size);
   }
 
   void _paintWaveShadows(Canvas canvas, Size size) {
@@ -121,34 +103,8 @@ class WateryBackgroundPainter extends CustomPainter {
     }
   }
 
-  void _paintSparkles(Canvas canvas, Size size) {
-    for (final sparkle in sparkles) {
-      final blink = (math.sin((t * math.pi * 2 * sparkle.speed) + sparkle.phase) + 1) * 0.5;
-      final alpha = 0.02 + blink * 0.09;
-      _sparklePaint.color = Colors.white.withValues(alpha: alpha);
-      final center = Offset(size.width * sparkle.x, size.height * sparkle.y);
-      canvas.drawCircle(center, sparkle.radius, _sparklePaint);
-    }
-  }
-
   @override
   bool shouldRepaint(covariant WateryBackgroundPainter oldDelegate) {
-    return oldDelegate.t != t || oldDelegate.sparkles != sparkles;
+    return oldDelegate.t != t;
   }
-}
-
-class _SparkleSpec {
-  const _SparkleSpec({
-    required this.x,
-    required this.y,
-    required this.radius,
-    required this.phase,
-    required this.speed,
-  });
-
-  final double x;
-  final double y;
-  final double radius;
-  final double phase;
-  final double speed;
 }
