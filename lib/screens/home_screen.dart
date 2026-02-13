@@ -122,18 +122,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _loadPersisted() async {
     final prefs = await SharedPreferences.getInstance();
-    final loaded = prefs.getInt('totalMl') ?? 0;
-    final goal = prefs.getInt('dailyGoalMl') ?? 1500;
+    final todayPersistedTotalMl = prefs.getInt('totalMl') ?? 0;
+    final persistedDailyGoalMl = prefs.getInt('dailyGoalMl') ?? 1500;
     if (!mounted) {
       return;
     }
     setState(() {
-      _displayTotalMl = loaded;
-      _dailyGoalMl = goal;
+      _displayTotalMl = todayPersistedTotalMl;
+      _dailyGoalMl = persistedDailyGoalMl;
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     });
-    debugPrint('HOME persisted loaded=$loaded display=$_displayTotalMl goal=$_dailyGoalMl');
+    debugPrint(
+      'HOME persisted total loaded: $todayPersistedTotalMl '
+      '(UI synced display=$_displayTotalMl goal=$_dailyGoalMl)',
+    );
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
