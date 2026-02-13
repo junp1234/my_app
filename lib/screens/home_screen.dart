@@ -9,7 +9,6 @@ import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/ripple_screen_overlay.dart';
-import '../widgets/sparkle_overlay.dart';
 import '../widgets/watery_background.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
@@ -47,7 +46,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
   late final AnimationController _fullScaleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
-  late final AnimationController _sparkleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 620));
   late final AnimationController _fullRippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 980));
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
@@ -76,9 +74,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fullScaleCtrl
       ..reset()
       ..stop();
-    _sparkleCtrl
-      ..reset()
-      ..stop();
     _fullRippleCtrl
       ..reset()
       ..stop();
@@ -104,7 +99,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _rippleCtrl.dispose();
     _shakeCtrl.dispose();
     _fullScaleCtrl.dispose();
-    _sparkleCtrl.dispose();
     _fullRippleCtrl.dispose();
     super.dispose();
   }
@@ -150,7 +144,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _celebrationRippleActive = true;
       _updateRippleCenter();
       _fullScaleCtrl.forward(from: 0);
-      _sparkleCtrl.forward(from: 0);
       _fullRippleCtrl.forward(from: 0);
       HapticFeedback.mediumImpact();
       unawaited(
@@ -334,7 +327,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     debugPrint('HOME build: displayTotal=$_displayTotalMl goal=$goal progress=$progress');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
-    final sparkleProgress = _sparkleCtrl.value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
     _updateRippleCenter();
@@ -383,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
                 Center(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullScaleCtrl, _sparkleCtrl]),
+                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullScaleCtrl]),
                     builder: (_, __) => GestureDetector(
                       onLongPress: _resetTodayTotal,
                       child: Stack(
@@ -398,11 +390,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               shakeT: _shakeCtrl.value,
                               dropT: _dropCtrl.value,
                               extraRippleLayer: _celebrationRippleActive,
-                            ),
-                          ),
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: SparkleOverlay(progress: sparkleProgress),
                             ),
                           ),
                         ],
