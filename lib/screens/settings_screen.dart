@@ -23,13 +23,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    _reloadFromPrefs();
   }
 
-  Future<void> _loadSettings() async {
+  Future<void> _reloadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final reloaded = settings.copyWith(
-      dailyGoalMl: prefs.getInt('dailyGoalMl') ?? 2000,
+      dailyGoalMl: prefs.getInt('dailyGoalMl') ?? settings.dailyGoalMl,
       stepMl: prefs.getInt('stepMl') ?? settings.stepMl,
       reminderEnabled: prefs.getBool('reminderEnabled') ?? settings.reminderEnabled,
     );
@@ -61,7 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       MaterialPageRoute(builder: (_) => const ProfileScreen(isFirstRun: false)),
     );
     if (changed == true) {
-      await _loadSettings();
+      await _reloadFromPrefs();
     }
   }
 

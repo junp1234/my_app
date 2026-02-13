@@ -35,7 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   late AppSettings _settings;
   int _displayTotalMl = 0;
-  int _todayPersistedTotalMl = 0;
+  int _dailyGoalMl = 1500;
   bool _canUndo = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
@@ -63,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     _settings = widget.settings;
     _displayTotalMl = 0;
+    _dailyGoalMl = 1500;
     _canUndo = false;
     _waterCtrl.value = 0.0;
     _waterLevelTween = Tween<double>(begin: 0, end: 0);
@@ -78,8 +79,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fullRippleCtrl
       ..reset()
       ..stop();
-    _loadPrefsAndMaybeShowProfile();
-    debugPrint('HOME init: displayTotal=$_displayTotalMl goal=${_settings.dailyGoalMl}');
+    _loadPersistedState();
+    _maybeShowProfileOnFirstRun();
+    debugPrint('HOME init: displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
     unawaited(_initializeHomeState());
   }
 
@@ -88,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.settings != widget.settings) {
       _settings = widget.settings;
+      _dailyGoalMl = widget.settings.dailyGoalMl;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     }
   }
@@ -107,22 +110,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _initializeHomeState() async {
     final loadedSettings = await _settingsRepo.load();
-    final todayTotal = await widget.repository.sumTodayMl();
     if (!mounted) {
       return;
     }
-    _settings = loadedSettings;
-    _todayPersistedTotalMl = todayTotal;
-    _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
-    setState(() {});
-    debugPrint('HOME persisted total loaded: $_todayPersistedTotalMl (UI display remains $_displayTotalMl)');
+    setState(() {
+      _settings = loadedSettings;
+      _dailyGoalMl = loadedSettings.dailyGoalMl;
+      _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
+    });
   }
 
-  Future<void> _loadPrefsAndMaybeShowProfile() async {
+  Future<void> _loadPersistedState() async {
+    final todayTotal = await widget.repository.sumTodayMl();
+    final prefs = await SharedPreferences.getInstance();
+    final total = prefs.getInt('totalMl') ?? todayTotal;
+    final goal = prefs.getInt('dailyGoalMl') ?? 1500;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _displayTotalMl = total;
+      _dailyGoalMl = goal;
+      _canUndo = _displayTotalMl > 0;
+      _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
+    });
+    debugPrint('HOME persisted state loaded: displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
+  }
+
+  Future<void> _maybeShowProfileOnFirstRun() async {
     final prefs = await SharedPreferences.getInstance();
     final done = prefs.getBool('profile_setup_done') ?? false;
     final skipped = prefs.getBool('profile_setup_skipped') ?? false;
-    print('profile done=$done skipped=$skipped');
+    print('firstRun done=$done skipped=$skipped');
 
     if (!done && !skipped && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -136,13 +155,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (!mounted) {
           return;
         }
-        setState(() {});
+        await _loadPersistedState();
       });
     }
   }
 
   double _computeProgress() {
-    final goal = _settings.dailyGoalMl;
+    final goal = _dailyGoalMl;
     return goal <= 0 ? 0.0 : (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
   }
 
@@ -231,14 +250,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final addMl = _settings.stepMl;
     await widget.repository.addEvent(addMl);
+    final prefs = await SharedPreferences.getInstance();
     if (!mounted) {
       return;
     }
 
     final nextTotal = _displayTotalMl + addMl;
-    final goal = _settings.dailyGoalMl;
+    final goal = _dailyGoalMl;
     final progress = goal <= 0 ? 0.0 : (nextTotal / goal).clamp(0.0, 1.0);
     debugPrint('tap add=$addMl displayTotal=$nextTotal goal=$goal progress=$progress');
+    await prefs.setInt('totalMl', nextTotal);
 
     setState(() {
       _displayTotalMl = nextTotal;
@@ -261,6 +282,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     await widget.repository.deleteEventById(latest!.id!);
+    final nextTotal = math.max(_displayTotalMl - latest.amountMl, 0);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('totalMl', nextTotal);
     if (!mounted) {
       return;
     }
@@ -268,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HapticFeedback.selectionClick();
 
     setState(() {
-      _displayTotalMl = math.max(_displayTotalMl - latest.amountMl, 0);
+      _displayTotalMl = nextTotal;
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: true, targetProgress: _computeProgress());
     });
@@ -283,14 +307,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!mounted || saved != true) {
       return;
     }
-    final reloaded = await _settingsRepo.load();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _settings = reloaded;
-      _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
-    });
+    await _loadPersistedState();
   }
 
   Future<void> _openHistory() async {
@@ -317,6 +334,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     await widget.repository.deleteTodayEvents();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('totalMl', 0);
     HapticFeedback.mediumImpact();
     if (!mounted) {
       return;
@@ -331,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final goal = _settings.dailyGoalMl;
+    final goal = _dailyGoalMl;
     final double progress = goal <= 0 ? 0.0 : (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
     debugPrint('HOME build: displayTotal=$_displayTotalMl goal=$goal progress=$progress');
 
