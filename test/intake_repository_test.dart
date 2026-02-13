@@ -71,4 +71,27 @@ void main() {
     final dbPath = await getDatabasesPath();
     await deleteDatabase('$dbPath/$dbName');
   });
+
+  test('getDailyTotalsForMonth returns local date keys and sums only focused month', () async {
+    final dbName = 'month_totals_test.db';
+    final helper = DatabaseHelper(databaseName: dbName);
+    final repository = IntakeRepository(dbHelper: helper);
+
+    final targetMonth = DateTime(2025, 2);
+    await repository.addEvent(200, at: DateTime(2025, 2, 1, 9));
+    await repository.addEvent(300, at: DateTime(2025, 2, 1, 20));
+    await repository.addEvent(150, at: DateTime(2025, 2, 14, 12));
+    await repository.addEvent(500, at: DateTime(2025, 3, 1, 0));
+
+    final totals = await repository.getDailyTotalsForMonth(targetMonth);
+
+    expect(totals['2025-02-01'], 500);
+    expect(totals['2025-02-14'], 150);
+    expect(totals.containsKey('2025-03-01'), isFalse);
+
+    final db = await helper.database;
+    await db.close();
+    final dbPath = await getDatabasesPath();
+    await deleteDatabase('$dbPath/$dbName');
+  });
 }

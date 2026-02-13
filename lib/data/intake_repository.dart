@@ -9,6 +9,13 @@ class IntakeRepository {
 
   final DatabaseHelper _dbHelper;
 
+  String _dateKey(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
   ({int start, int end}) _dayRange(DateTime day) {
     final start = DateTime(day.year, day.month, day.day).millisecondsSinceEpoch;
     final end = DateTime(day.year, day.month, day.day + 1).millisecondsSinceEpoch;
@@ -98,21 +105,21 @@ class IntakeRepository {
     return rows.map(IntakeEvent.fromMap).toList();
   }
 
-  Future<Map<DateTime, int>> getDailyTotalsForMonth(DateTime month) async {
+  Future<Map<String, int>> getDailyTotalsForMonth(DateTime monthLocal) async {
     final db = await _dbHelper.database;
-    final start = DateTime(month.year, month.month);
-    final end = DateTime(month.year, month.month + 1);
+    final start = DateTime(monthLocal.year, monthLocal.month);
+    final end = DateTime(monthLocal.year, monthLocal.month + 1);
     final rows = await db.query(
       'intake_events',
       columns: ['timestamp', 'amount_ml'],
       where: 'timestamp >= ? AND timestamp < ?',
       whereArgs: [start.millisecondsSinceEpoch, end.millisecondsSinceEpoch],
     );
-    final result = <DateTime, int>{};
+    final result = <String, int>{};
     for (final row in rows) {
       final dt = DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int);
-      final day = DateTime(dt.year, dt.month, dt.day);
-      result[day] = (result[day] ?? 0) + (row['amount_ml'] as int);
+      final key = _dateKey(DateTime(dt.year, dt.month, dt.day));
+      result[key] = (result[key] ?? 0) + (row['amount_ml'] as int);
     }
     return result;
   }
