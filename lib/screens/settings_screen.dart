@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
+import 'profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.initial});
@@ -33,6 +34,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } else {
       await _updateSettings(settings.copyWith(sleepMinutes: picked.hour * 60 + picked.minute));
     }
+  }
+
+
+  Future<void> _openProfile() async {
+    final recommendedMl = await Navigator.of(context).push<int>(
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    );
+
+    if (recommendedMl == null) {
+      return;
+    }
+
+    await _updateSettings(settings.copyWith(dailyGoalMl: recommendedMl));
   }
 
   Future<bool> _onWillPop() async {
@@ -71,6 +85,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+
+            ListTile(
+              title: const Text('profile'),
+              subtitle: const Text('プロフィールから必要水分量を計算'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _openProfile,
+            ),
+
             _tile(
               'stepMl',
               '${settings.stepMl} ml',
