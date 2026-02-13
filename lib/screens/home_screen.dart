@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
@@ -108,14 +107,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _initializeHomeState() async {
     final loadedSettings = await _settingsRepo.load();
-    final prefs = await SharedPreferences.getInstance();
-    final profileGoalMl = prefs.getInt(ProfileRepository.keyWaterMl) ?? AppSettings.defaults.dailyGoalMl;
-    final mergedSettings = loadedSettings.copyWith(dailyGoalMl: profileGoalMl);
     final todayTotal = await widget.repository.sumTodayMl();
     if (!mounted) {
       return;
     }
-    _settings = mergedSettings;
+    _settings = loadedSettings;
     _todayPersistedTotalMl = todayTotal;
     _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     setState(() {});
@@ -277,13 +273,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
     final reloaded = await _settingsRepo.load();
-    final prefs = await SharedPreferences.getInstance();
-    final profileGoalMl = prefs.getInt(ProfileRepository.keyWaterMl) ?? AppSettings.defaults.dailyGoalMl;
     if (!mounted) {
       return;
     }
     setState(() {
-      _settings = reloaded.copyWith(dailyGoalMl: profileGoalMl);
+      _settings = reloaded;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     });
   }
