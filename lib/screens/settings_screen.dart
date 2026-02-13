@@ -38,15 +38,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
 
   Future<void> _openProfile() async {
-    final recommendedMl = await Navigator.of(context).push<int>(
+    final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const ProfileScreen()),
     );
 
-    if (recommendedMl == null) {
+    if (saved != true) {
       return;
     }
 
-    await _updateSettings(settings.copyWith(dailyGoalMl: recommendedMl));
+    final reloaded = await _settingsRepo.load();
+    await _updateSettings(reloaded);
   }
 
   Future<bool> _onWillPop() async {
