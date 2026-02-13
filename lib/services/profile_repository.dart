@@ -16,6 +16,7 @@ class ProfileRepository {
   static const String keyPregnant = 'profile_pregnant';
   static const String keyLactating = 'profile_lactating';
   static const String keyWaterMl = 'profile_water_ml';
+  static const String keyLastCalculatedMl = 'profile_last_calculated_ml';
   static const String keySetupDone = 'profile_setup_done';
   static const String keySetupSkipped = 'profile_setup_skipped';
 
@@ -46,6 +47,8 @@ class ProfileRepository {
     await prefs.setBool(keyPregnant, profile.pregnant);
     await prefs.setBool(keyLactating, profile.breastfeeding);
     await prefs.setInt(keyWaterMl, recommendedMl);
+    await prefs.setInt(keyLastCalculatedMl, recommendedMl);
+    await prefs.setInt('dailyGoalMl', recommendedMl);
     await prefs.setBool(keySetupDone, true);
     await prefs.setBool(keySetupSkipped, false);
 

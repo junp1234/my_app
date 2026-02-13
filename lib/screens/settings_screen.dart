@@ -19,6 +19,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _settingsRepo = SettingsRepository.instance;
   late AppSettings settings = widget.initial;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final reloaded = await _settingsRepo.load();
+    if (!mounted) {
+      return;
+    }
+    setState(() => settings = reloaded);
+  }
+
   Future<void> _updateSettings(AppSettings next) async {
     setState(() => settings = next);
     await _settingsRepo.save(next);
@@ -36,18 +50,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-
   Future<void> _openProfile() async {
-    final saved = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const ProfileScreen()),
     );
-
-    if (saved != true) {
-      return;
-    }
-
-    final reloaded = await _settingsRepo.load();
-    await _updateSettings(reloaded);
+    await _loadSettings();
   }
 
   Future<bool> _onWillPop() async {
