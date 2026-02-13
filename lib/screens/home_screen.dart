@@ -2,16 +2,18 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
+import '../services/profile_repository.dart';
 import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import '../widgets/watery_background.dart';
 import 'history_screen.dart';
-import 'settings_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -36,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _displayTotalMl = 0;
   int _todayPersistedTotalMl = 0;
   bool _canUndo = false;
+  bool _initialProfilePromptHandled = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
   bool _isHolding = false;
@@ -105,14 +108,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _initializeHomeState() async {
     final loadedSettings = await _settingsRepo.load();
+    final prefs = await SharedPreferences.getInstance();
+    final profileGoalMl = prefs.getInt(ProfileRepository.keyWaterMl) ?? AppSettings.defaults.dailyGoalMl;
+    final mergedSettings = loadedSettings.copyWith(dailyGoalMl: profileGoalMl);
     final todayTotal = await widget.repository.sumTodayMl();
     if (!mounted) {
       return;
     }
-    _settings = loadedSettings;
+    _settings = mergedSettings;
     _todayPersistedTotalMl = todayTotal;
     _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     setState(() {});
+    if (!_initialProfilePromptHandled) {
+      _initialProfilePromptHandled = true;
+      final shouldPrompt = await ProfileRepository.instance.shouldShowInitialSetup();
+      if (mounted && shouldPrompt) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          unawaited(_openProfile(isInitialSetup: true));
+        });
+      }
+    }
     debugPrint('HOME persisted total loaded: $_todayPersistedTotalMl (UI display remains $_displayTotalMl)');
   }
 
@@ -251,37 +269,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _rippleCtrl.value = 0;
   }
 
-  Future<void> _openSettings() async {
-    final previousSettings = _settings;
-    final result = await Navigator.of(context).push<AppSettings>(
-      MaterialPageRoute(builder: (_) => SettingsScreen(initial: _settings)),
+  Future<void> _openProfile({bool isInitialSetup = false}) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ProfileScreen(isInitialSetup: isInitialSetup)),
     );
-    if (!mounted) {
+    if (!mounted || saved != true) {
       return;
     }
-    if (result != null) {
-      final askPermission = !previousSettings.reminderEnabled && result.reminderEnabled;
-      setState(() {
-        _settings = result;
-        _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
-      });
-      await widget.onSettingsChanged(result, askPermission);
-      return;
-    }
-    await _reloadSettings(previousSettings: previousSettings);
-  }
-
-  Future<void> _reloadSettings({required AppSettings previousSettings}) async {
     final reloaded = await _settingsRepo.load();
-    final askPermission = !previousSettings.reminderEnabled && reloaded.reminderEnabled;
+    final prefs = await SharedPreferences.getInstance();
+    final profileGoalMl = prefs.getInt(ProfileRepository.keyWaterMl) ?? AppSettings.defaults.dailyGoalMl;
     if (!mounted) {
       return;
     }
     setState(() {
-      _settings = reloaded;
+      _settings = reloaded.copyWith(dailyGoalMl: profileGoalMl);
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     });
-    await widget.onSettingsChanged(reloaded, askPermission);
   }
 
   Future<void> _openHistory() async {
@@ -363,15 +367,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Positioned(
                 top: 8,
                 left: 8,
-                child: IconButton(onPressed: _openSettings, icon: const Icon(Icons.settings_outlined)),
+                child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.history)),
               ),
               Positioned(
                 top: 8,
                 right: 8,
-                child: GestureDetector(
-                  onLongPress: _resetTodayTotal,
-                  child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.history)),
-                ),
+                child: IconButton(onPressed: _openProfile, icon: const Icon(Icons.settings_outlined)),
               ),
                 Center(
                   child: AnimatedBuilder(

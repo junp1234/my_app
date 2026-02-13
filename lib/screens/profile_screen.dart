@@ -5,7 +5,9 @@ import '../services/hydration_calculator.dart';
 import '../services/profile_repository.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.isInitialSetup = false});
+
+  final bool isInitialSetup;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -47,7 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    _heightController.text = profile.heightCm.toStringAsFixed(1);
+    _heightController.text = profile.heightCm.round().toString();
     _weightController.text = profile.weightKg.toStringAsFixed(1);
     _ageController.text = profile.age.toString();
 
@@ -70,16 +72,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   UserProfile? _currentProfileOrNull() {
-    final height = double.tryParse(_heightController.text);
+    final height = int.tryParse(_heightController.text);
     final weight = double.tryParse(_weightController.text);
     final age = int.tryParse(_ageController.text);
 
-    if (height == null || weight == null || age == null || height <= 0 || weight <= 0 || age <= 0) {
+    if (height == null || weight == null || age == null) {
       return null;
     }
 
     return UserProfile(
-      heightCm: height,
+      heightCm: height.toDouble(),
       weightKg: weight,
       age: age,
       activityIntensity: _activity,
@@ -98,22 +100,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final recommended = HydrationCalculator.calculateDailyMl(profile);
     await _repo.save(profile);
 
     if (!mounted) {
       return;
     }
 
-    Navigator.pop(context, recommended);
+    Navigator.pop(context, true);
+  }
+
+  Future<void> _skipForNow() async {
+    await _repo.skipInitialSetup();
+    if (!mounted) {
+      return;
+    }
+    Navigator.pop(context, false);
   }
 
   String _activityLabel(ActivityIntensity intensity) {
     return switch (intensity) {
-      ActivityIntensity.none => 'なし',
-      ActivityIntensity.light => '軽い',
-      ActivityIntensity.normal => '普通',
-      ActivityIntensity.strong => '強い',
+      ActivityIntensity.none => 'none',
+      ActivityIntensity.light => 'light',
+      ActivityIntensity.normal => 'normal',
+      ActivityIntensity.strong => 'hard',
     };
   }
 
@@ -121,105 +130,126 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final liters = (_recommendedMl / 1000).toStringAsFixed(1);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('プロフィール')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _heightController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '身長 (cm)'),
-              validator: _positiveNumberValidator,
-            ),
-            TextFormField(
-              controller: _weightController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: '体重 (kg)'),
-              validator: _positiveNumberValidator,
-            ),
-            TextFormField(
-              controller: _ageController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: '年齢'),
-              validator: _positiveIntegerValidator,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<ActivityIntensity>(
-              value: _activity,
-              decoration: const InputDecoration(labelText: '運動強度'),
-              items: ActivityIntensity.values
-                  .map(
-                    (value) => DropdownMenuItem<ActivityIntensity>(
-                      value: value,
-                      child: Text(_activityLabel(value)),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-                setState(() {
-                  _activity = value;
-                });
-                _recalculate();
-              },
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('妊娠'),
-              value: _pregnant,
-              onChanged: (value) {
-                setState(() {
-                  _pregnant = value;
-                });
-                _recalculate();
-              },
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('授乳'),
-              value: _breastfeeding,
-              onChanged: (value) {
-                setState(() {
-                  _breastfeeding = value;
-                });
-                _recalculate();
-              },
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  '推奨：$_recommendedMl mL/日（$liters L）',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    return WillPopScope(
+      onWillPop: () async => !widget.isInitialSetup,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              TextFormField(
+                controller: _heightController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '身長 (cm)'),
+                validator: _heightValidator,
+              ),
+              TextFormField(
+                controller: _weightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: '体重 (kg)'),
+                validator: _weightValidator,
+              ),
+              TextFormField(
+                controller: _ageController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '年齢'),
+                validator: _ageValidator,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<ActivityIntensity>(
+                value: _activity,
+                decoration: const InputDecoration(labelText: '運動強度'),
+                items: ActivityIntensity.values
+                    .map(
+                      (value) => DropdownMenuItem<ActivityIntensity>(
+                        value: value,
+                        child: Text(_activityLabel(value)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _activity = value;
+                  });
+                  _recalculate();
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('妊娠'),
+                value: _pregnant,
+                onChanged: (value) {
+                  setState(() {
+                    _pregnant = value;
+                    if (value) {
+                      _breastfeeding = false;
+                    }
+                  });
+                  _recalculate();
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('授乳'),
+                value: _breastfeeding,
+                onChanged: (value) {
+                  setState(() {
+                    _breastfeeding = value;
+                    if (value) {
+                      _pregnant = false;
+                    }
+                  });
+                  _recalculate();
+                },
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    '推奨: $_recommendedMl mL/日 ($liters L)',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: _save, child: const Text('保存')),
-          ],
+              const SizedBox(height: 16),
+              FilledButton(onPressed: _save, child: const Text('保存')),
+              if (widget.isInitialSetup) ...[
+                const SizedBox(height: 8),
+                TextButton(onPressed: _skipForNow, child: const Text('今はスキップ')),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String? _positiveNumberValidator(String? value) {
-    final parsed = double.tryParse(value ?? '');
-    if (parsed == null || parsed <= 0) {
-      return '正の数を入力してください';
+  String? _heightValidator(String? value) {
+    final parsed = int.tryParse(value ?? '');
+    if (parsed == null || parsed < 80 || parsed > 250) {
+      return '80〜250の整数で入力してください';
     }
     return null;
   }
 
-  String? _positiveIntegerValidator(String? value) {
+  String? _weightValidator(String? value) {
+    final parsed = double.tryParse(value ?? '');
+    if (parsed == null || parsed < 20 || parsed > 300) {
+      return '20〜300の範囲で入力してください';
+    }
+    return null;
+  }
+
+  String? _ageValidator(String? value) {
     final parsed = int.tryParse(value ?? '');
-    if (parsed == null || parsed <= 0) {
-      return '1以上の整数を入力してください';
+    if (parsed == null || parsed < 0 || parsed > 120) {
+      return '0〜120の整数で入力してください';
     }
     return null;
   }
