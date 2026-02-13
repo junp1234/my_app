@@ -114,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await prefs.setInt('dailyGoalMl', recommendedMl);
     await prefs.setBool('profile_setup_done', true);
     await prefs.setBool('profile_setup_skipped', false);
-    print('profile save recommendedMl=$recommendedMl');
+    debugPrint('profile save recommendedMl=$recommendedMl');
 
     if (!mounted) {
       return;
@@ -126,7 +126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _skipForNow() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('profile_setup_skipped', true);
-    print('profile skipped');
+    debugPrint('profile skipped');
     if (!mounted) {
       return;
     }

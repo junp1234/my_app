@@ -121,9 +121,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadPersisted() async {
-    final todayTotal = await widget.repository.sumTodayMl();
     final prefs = await SharedPreferences.getInstance();
-    final loaded = prefs.getInt('totalMl') ?? todayTotal;
+    final loaded = prefs.getInt('totalMl') ?? 0;
     final goal = prefs.getInt('dailyGoalMl') ?? 1500;
     if (!mounted) {
       return;
@@ -134,30 +133,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     });
-    debugPrint('HOME persisted loaded=$loaded -> displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
+    debugPrint('HOME persisted loaded=$loaded display=$_displayTotalMl goal=$_dailyGoalMl');
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
     final prefs = await SharedPreferences.getInstance();
     final done = prefs.getBool('profile_setup_done') ?? false;
     final skipped = prefs.getBool('profile_setup_skipped') ?? false;
-    print('firstRun done=$done skipped=$skipped');
+    debugPrint('firstRun done=$done skipped=$skipped');
 
-    if (!done && !skipped && mounted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) {
-          return;
-        }
-        await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(builder: (_) => const ProfileScreen(isFirstRun: true)),
-        );
-        if (!mounted) {
-          return;
-        }
-        await _loadPersisted();
-      });
+    if (done || skipped || !mounted) {
+      return;
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
+      final changed = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => const ProfileScreen(isFirstRun: true)),
+      );
+      if (!mounted || changed != true) {
+        return;
+      }
+      await _loadPersisted();
+    });
   }
 
   double _computeProgress() {
