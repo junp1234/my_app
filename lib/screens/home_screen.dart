@@ -79,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fullRippleCtrl
       ..reset()
       ..stop();
-    _loadPersistedState();
+    _loadPersisted();
     _maybeShowProfileOnFirstRun();
     debugPrint('HOME init: displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
     unawaited(_initializeHomeState());
@@ -120,21 +120,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  Future<void> _loadPersistedState() async {
+  Future<void> _loadPersisted() async {
     final todayTotal = await widget.repository.sumTodayMl();
     final prefs = await SharedPreferences.getInstance();
-    final total = prefs.getInt('totalMl') ?? todayTotal;
+    final loaded = prefs.getInt('totalMl') ?? todayTotal;
     final goal = prefs.getInt('dailyGoalMl') ?? 1500;
     if (!mounted) {
       return;
     }
     setState(() {
-      _displayTotalMl = total;
+      _displayTotalMl = loaded;
       _dailyGoalMl = goal;
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     });
-    debugPrint('HOME persisted state loaded: displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
+    debugPrint('HOME persisted loaded=$loaded -> displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (!mounted) {
           return;
         }
-        await _loadPersistedState();
+        await _loadPersisted();
       });
     }
   }
@@ -307,7 +307,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!mounted || saved != true) {
       return;
     }
-    await _loadPersistedState();
+    await _loadPersisted();
   }
 
   Future<void> _openHistory() async {
