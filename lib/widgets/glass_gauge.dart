@@ -84,12 +84,16 @@ class _GlassGaugePainter extends CustomPainter {
 
     final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
     final rippleCenter = Offset(center.dx, waterTopY + 6);
+    final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
+    canvas.save();
+    canvas.clipPath(waterPath);
     RipplePainter(
       t: rippleT,
       center: rippleCenter,
       maxWidth: innerRect.width * 0.42,
       extraLayer: extraRippleLayer,
     ).paint(canvas, size);
+    canvas.restore();
 
     _paintFallingDrop(canvas, size, waterTopY);
     canvas.restore();
