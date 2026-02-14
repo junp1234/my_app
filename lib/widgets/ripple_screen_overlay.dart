@@ -3,57 +3,75 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
+import 'painters/water_fill_painter.dart';
 
 class RippleScreenOverlay extends StatelessWidget {
   const RippleScreenOverlay({
     super.key,
-    required this.t,
-    required this.center,
-    required this.enabled,
+    required this.size,
+    required this.progress,
+    required this.burstT,
   });
 
-  final Animation<double> t;
-  final Offset? center;
-  final bool enabled;
+  final double size;
+  final double progress;
+  final double burstT;
 
   @override
   Widget build(BuildContext context) {
-    if (!enabled || center == null) {
-      return const SizedBox.expand();
+    if (burstT <= 0 || progress <= 0) {
+      return const SizedBox.shrink();
     }
 
-    return CustomPaint(
-      painter: _RippleScreenPainter(
-        t: t.value,
-        center: center!,
+    return IgnorePointer(
+      child: SizedBox.square(
+        dimension: size,
+        child: CustomPaint(
+          painter: _RippleScreenPainter(
+            progress: progress,
+            burstT: burstT,
+          ),
+        ),
       ),
-      child: const SizedBox.expand(),
     );
   }
 }
 
 class _RippleScreenPainter extends CustomPainter {
   const _RippleScreenPainter({
-    required this.t,
-    required this.center,
+    required this.progress,
+    required this.burstT,
   });
 
-  final double t;
-  final Offset center;
+  final double progress;
+  final double burstT;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final maxR = math.sqrt((size.width * size.width) + (size.height * size.height)) * 1.05;
-    _drawRing(canvas, maxR: maxR, progress: t, alphaMultiplier: 1.0);
+    final center = size.center(Offset.zero);
+    final bowlRadius = size.width * 0.39;
+    final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
+    final innerRect = outerRect.deflate(11);
+    final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
+    final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
+    final rippleCenter = Offset(center.dx, waterTopY + 6);
+
+    canvas.save();
+    canvas.clipPath(waterPath);
+
+    final maxR = innerRect.width * 0.44;
+    _drawRing(canvas, center: rippleCenter, maxR: maxR, progress: burstT, alphaMultiplier: 1.0);
 
     const delay = 0.18;
-    final t2 = ((t - delay) / (1 - delay)).clamp(0.0, 1.0);
-    _drawRing(canvas, maxR: maxR, progress: t2, alphaMultiplier: 0.65);
+    final t2 = ((burstT - delay) / (1 - delay)).clamp(0.0, 1.0);
+    _drawRing(canvas, center: rippleCenter, maxR: maxR, progress: t2, alphaMultiplier: 0.75);
+
+    canvas.restore();
   }
 
   void _drawRing(
     Canvas canvas, {
+    required Offset center,
     required double maxR,
     required double progress,
     required double alphaMultiplier,
@@ -65,34 +83,19 @@ class _RippleScreenPainter extends CustomPainter {
     final eased = Curves.easeOut.transform(progress);
     final radius = lerpDouble(0, maxR, eased)!;
     final pulse = math.sin(math.pi * progress).clamp(0.0, 1.0);
-    final alpha = (pulse * 0.3 * alphaMultiplier).clamp(0.0, 1.0);
-    final strokeWidth = lerpDouble(1.4, 3.0, pulse)!;
-
-    final shadowPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth + 2.8
-      ..color = const Color(0xFF5D7286).withValues(alpha: alpha * 0.24)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
-
-    final glowPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth + 2.2
-      ..color = AppColors.primary.withValues(alpha: alpha * 0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    final alpha = (pulse * 0.28 * alphaMultiplier).clamp(0.0, 1.0);
+    final strokeWidth = lerpDouble(1.6, 3.0, pulse)!;
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..color = AppColors.primaryStrong.withValues(alpha: (alpha * 0.9).clamp(0.0, 1.0))
-      ..blendMode = BlendMode.srcOver;
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: alpha);
 
-    canvas.drawCircle(center, radius, shadowPaint);
-    canvas.drawCircle(center, radius * 0.994, glowPaint);
-    canvas.drawCircle(center, radius, paint);
+    canvas.drawOval(Rect.fromCenter(center: center, width: radius * 2.2, height: radius * 0.72), paint);
   }
 
   @override
   bool shouldRepaint(covariant _RippleScreenPainter oldDelegate) {
-    return oldDelegate.t != t || oldDelegate.center != center;
+    return oldDelegate.progress != progress || oldDelegate.burstT != burstT;
   }
 }

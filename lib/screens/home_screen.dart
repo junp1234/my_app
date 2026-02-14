@@ -1,16 +1,20 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
-import '../services/settings_repository.dart';
-import '../widgets/droplet_button.dart';
-import '../widgets/completed_overlay.dart';
-import '../widgets/glass_gauge.dart';
 import '../services/daily_totals_service.dart';
+import '../services/settings_repository.dart';
 import '../services/water_log_service.dart';
+import '../theme/water_theme.dart';
+import '../widgets/completed_overlay.dart';
+import '../widgets/droplet_button.dart';
+import '../widgets/glass_gauge.dart';
+import '../widgets/ripple_screen_overlay.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 
@@ -38,6 +42,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _dailyGoalMl = 1500;
   int _todayCount = 0;
   bool _canUndo = false;
+  bool _wasGoalReached = false;
+  final List<int> _intakeHistory = [];
+
   late final WaterLogService _waterLogService;
   Timer? _holdTimer;
   int _holdLevel = 1;
@@ -48,34 +55,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _waterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+  late final AnimationController _celebrationCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1050),
+  )..addStatusListener((status) {
+      if (status == AnimationStatus.completed && mounted) {
+        setState(() {});
+      }
+    });
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
-  bool _hasCelebratedFull = false;
-  bool _showCompletedOverlay = false;
-  bool _completedOverlayShownToday = false;
-  String _overlayDateKey = '';
-  final GlobalKey _glassKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _settings = widget.settings;
-    _todayTotalMl = 0;
-    _dailyGoalMl = 1500;
-    _todayCount = 0;
-    _canUndo = false;
-    _waterCtrl.value = 0.0;
-    _waterLevelTween = Tween<double>(begin: 0, end: 0);
-    _rippleCtrl
-      ..reset()
-      ..stop();
-    _shakeCtrl
-      ..reset()
-      ..stop();
-    _maybeShowProfileOnFirstRun();
-    unawaited(_prepareCompletedOverlayState());
     _waterLogService = WaterLogService(widget.repository);
-    debugPrint('HOME init: total=$_todayTotalMl goal=$_dailyGoalMl');
+    _maybeShowProfileOnFirstRun();
     unawaited(_initializeHomeState());
   }
 
@@ -86,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _settings = widget.settings;
       _dailyGoalMl = widget.settings.dailyGoalMl;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
+      _wasGoalReached = _todayTotalMl >= _dailyGoalMl;
     }
   }
 
@@ -97,6 +94,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _waterCtrl.dispose();
     _rippleCtrl.dispose();
     _shakeCtrl.dispose();
+    _celebrationCtrl.dispose();
     super.dispose();
   }
 
@@ -104,94 +102,74 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final loadedSettings = await _settingsRepo.load();
     final todayTotal = await _waterLogService.getTodayTotal();
     final todayCount = await _waterLogService.getTodayCount();
+    final todayEvents = await widget.repository.getEventsForDay(DateTime.now());
     await _waterLogService.pruneOld();
     if (!mounted) {
       return;
     }
+
+    _intakeHistory
+      ..clear()
+      ..addAll(todayEvents.map((e) => e.amountMl));
+
+    final progress = loadedSettings.dailyGoalMl <= 0 ? 0.0 : (todayTotal / loadedSettings.dailyGoalMl).clamp(0.0, 1.0).toDouble();
     setState(() {
       _settings = loadedSettings;
       _dailyGoalMl = loadedSettings.dailyGoalMl;
       _todayTotalMl = todayTotal;
       _todayCount = todayCount;
-      _canUndo = _todayCount > 0;
-      _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
+      _canUndo = _intakeHistory.isNotEmpty;
+      _syncWaterAnimation(animate: false, targetProgress: progress);
+      _wasGoalReached = _todayTotalMl >= _dailyGoalMl;
     });
-    debugPrint('HOME total=$_todayTotalMl goal=$_dailyGoalMl progress=${_computeProgress()} undoCount=$todayCount');
   }
 
   Future<void> _refreshTodayState({required bool animate}) async {
-    final previousTotal = _todayTotalMl;
     final total = await _waterLogService.getTodayTotal();
     final count = await _waterLogService.getTodayCount();
     if (!mounted) {
       return;
     }
+
     final goal = _dailyGoalMl;
     final progress = goal <= 0 ? 0.0 : (total / goal).clamp(0.0, 1.0).toDouble();
     setState(() {
       _todayTotalMl = total;
       _todayCount = count;
-      _canUndo = _todayCount > 0;
+      _canUndo = _intakeHistory.isNotEmpty;
       _syncWaterAnimation(animate: animate, targetProgress: progress);
     });
-    _evaluateCompletedOverlay(previousTotal, total);
-    debugPrint('COMPLETED: ${total >= _dailyGoalMl}');
-    debugPrint('HOME total=$_todayTotalMl goal=$_dailyGoalMl progress=$progress undoCount=$count');
+
+    _handleGoalCrossing(totalMl: total, goalMl: goal);
   }
 
-
-  String _todayOverlayKey() {
-    final now = DateTime.now();
-    final yyyy = now.year.toString().padLeft(4, '0');
-    final mm = now.month.toString().padLeft(2, '0');
-    final dd = now.day.toString().padLeft(2, '0');
-    return 'completedShown_${yyyy}${mm}${dd}';
-  }
-
-  Future<void> _prepareCompletedOverlayState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = _todayOverlayKey();
-    final shown = prefs.getBool(key) ?? false;
-    if (!mounted) {
+  void _handleGoalCrossing({required int totalMl, required int goalMl}) {
+    if (goalMl <= 0) {
+      _wasGoalReached = false;
       return;
     }
-    setState(() {
-      _overlayDateKey = key;
-      _completedOverlayShownToday = shown;
-      if (shown) {
-        _showCompletedOverlay = false;
-      }
-    });
+
+    final nowReached = totalMl >= goalMl;
+    if (!_wasGoalReached && nowReached) {
+      _triggerGoalCelebration();
+    }
+    _wasGoalReached = nowReached;
   }
 
-  Future<void> _markCompletedOverlayDismissed() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = _overlayDateKey.isEmpty ? _todayOverlayKey() : _overlayDateKey;
-    await prefs.setBool(key, true);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _completedOverlayShownToday = true;
-      _showCompletedOverlay = false;
-    });
-  }
-
-  void _evaluateCompletedOverlay(int previousTotal, int newTotal) {
-    final reachedNow = previousTotal < _dailyGoalMl && newTotal >= _dailyGoalMl;
-    if (!reachedNow || _completedOverlayShownToday) {
-      return;
-    }
-    setState(() {
-      _showCompletedOverlay = true;
-    });
+  void _triggerGoalCelebration() {
+    HapticFeedback.mediumImpact();
+    _waterLevelTween = Tween<double>(begin: _animatedWaterLevel, end: 1.0);
+    _waterCtrl
+      ..reset()
+      ..forward();
+    _rippleCtrl.forward(from: 0);
+    _celebrationCtrl.forward(from: 0);
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
     final prefs = await SharedPreferences.getInstance();
     final done = prefs.getBool('profile_setup_done') ?? false;
     final skipped = prefs.getBool('profile_setup_skipped') ?? false;
-    debugPrint('firstRun done=$done skipped=$skipped');
 
     if (done || skipped || !mounted) {
       return;
@@ -229,16 +207,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _waterLevelTween = Tween<double>(begin: targetProgress, end: targetProgress);
       _waterCtrl.value = 0.0;
     }
-    _checkFullCelebration(targetProgress);
-  }
-
-  void _checkFullCelebration(double progress) {
-    if (progress >= 1.0 && !_hasCelebratedFull) {
-      _hasCelebratedFull = true;
-      HapticFeedback.mediumImpact();
-    } else if (progress < 1.0) {
-      _hasCelebratedFull = false;
-    }
   }
 
   Future<void> _addWater() async {
@@ -250,23 +218,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HapticFeedback.selectionClick();
 
     final addMl = _settings.stepMl;
+    _intakeHistory.add(addMl);
     await _waterLogService.add(addMl);
     await _refreshTodayState(animate: true);
-    debugPrint('RIPPLE: triggered at level=${_computeProgress().toStringAsFixed(3)}');
 
     _rippleCtrl.forward(from: 0);
     _shakeCtrl.forward(from: 0);
   }
 
   Future<void> _undo() async {
-    if (!_canUndo) {
+    if (_intakeHistory.isEmpty) {
       return;
     }
 
+    final removedMl = _intakeHistory.removeLast();
     final undone = await _waterLogService.undoLast();
     if (!undone) {
+      _intakeHistory.add(removedMl);
       return;
     }
+
+    _todayTotalMl = math.max(0, _todayTotalMl - removedMl);
+    await DailyTotalsService.setToday(math.max(0, _todayTotalMl));
 
     HapticFeedback.selectionClick();
     await _refreshTodayState(animate: true);
@@ -308,6 +281,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     await widget.repository.deleteTodayEvents();
     await DailyTotalsService.setToday(0);
+    _intakeHistory.clear();
+    _wasGoalReached = false;
     HapticFeedback.mediumImpact();
     await _refreshTodayState(animate: true);
   }
@@ -315,12 +290,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final goal = _dailyGoalMl;
-    final double progress = goal <= 0 ? 0.0 : (_todayTotalMl / goal).clamp(0.0, 1.0).toDouble();
     final bool isCompleted = _todayTotalMl >= goal && goal > 0;
-    debugPrint('HOME total=$_todayTotalMl goal=$goal progress=$progress undoCount=$_todayCount');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
+
+    final celebrationBg = CurvedAnimation(
+      parent: _celebrationCtrl,
+      curve: const Interval(0.0, 0.78, curve: Curves.easeOut),
+    ).value;
+    final celebrationBurst = CurvedAnimation(
+      parent: _celebrationCtrl,
+      curve: const Interval(0.0, 0.40, curve: Curves.easeOutCubic),
+    ).value;
+    final shouldShowCelebration = _celebrationCtrl.isAnimating;
 
     return Scaffold(
       body: Stack(
@@ -332,8 +315,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 end: Alignment.bottomCenter,
                 colors: isCompleted
                     ? const [
-                        Color(0xFF2F8FCE),
-                        Color(0xFF63B8E8),
+                        WaterTheme.deepWater,
+                        WaterTheme.primaryWater,
                       ]
                     : const [
                         Color(0xFFF2F2F7),
@@ -342,6 +325,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
+          if (shouldShowCelebration)
+            CompletedOverlay(
+              progress: _celebrationCtrl.value,
+              backgroundStrength: celebrationBg,
+            ),
           SafeArea(
             child: Stack(
               children: [
@@ -363,11 +351,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 Center(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl]),
+                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _celebrationCtrl]),
                     builder: (_, __) => GestureDetector(
                       onLongPress: _resetTodayTotal,
                       child: Stack(
-                        key: _glassKey,
                         alignment: Alignment.center,
                         children: [
                           GlassGauge(
@@ -375,6 +362,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             rippleT: _rippleCtrl.value,
                             shakeT: _shakeCtrl.value,
                             dropT: _dropCtrl.value,
+                            extraRippleLayer: celebrationBurst > 0.02,
+                          ),
+                          RippleScreenOverlay(
+                            size: 272,
+                            progress: _animatedWaterLevel,
+                            burstT: celebrationBurst,
                           ),
                         ],
                       ),
@@ -437,8 +430,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          if (_showCompletedOverlay)
-            CompletedOverlay(onClose: _markCompletedOverlayDismissed),
         ],
       ),
     );

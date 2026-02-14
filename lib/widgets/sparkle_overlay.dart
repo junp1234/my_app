@@ -2,11 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../theme/water_theme.dart';
+
 class SparkleOverlay extends StatelessWidget {
   const SparkleOverlay({
     super.key,
     required this.progress,
-    this.count = 10,
+    this.count = 24,
   });
 
   final double progress;
@@ -37,31 +39,35 @@ class _SparklePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final opacityIn = Curves.easeOut.transform((t / 0.28).clamp(0.0, 1.0));
-    final opacityOut = 1 - Curves.easeIn.transform(((t - 0.42) / 0.58).clamp(0.0, 1.0));
-    final alpha = (opacityIn * opacityOut).clamp(0.0, 1.0);
+    final fadeIn = Curves.easeOut.transform((t / 0.20).clamp(0.0, 1.0));
+    final fadeOut = 1 - Curves.easeIn.transform(((t - 0.52) / 0.48).clamp(0.0, 1.0));
+    final alpha = (fadeIn * fadeOut).clamp(0.0, 1.0);
     if (alpha <= 0) {
       return;
     }
 
     final center = size.center(Offset.zero);
-    final topAnchor = Offset(center.dx, center.dy - (size.shortestSide * 0.34));
+    final anchor = Offset(center.dx, center.dy + size.height * 0.1);
 
     for (var i = 0; i < count; i++) {
-      final seed = i * 0.73 + 1.1;
-      final spread = 16 + (i % 3) * 5.0;
-      final angle = (2 * math.pi / count) * i + math.sin(seed) * 0.35;
-      final baseOffset = Offset(math.cos(angle) * spread, math.sin(angle) * 5);
+      final seed = i * 1.17 + 7;
+      final radius = size.shortestSide * (0.07 + (i % 6) * 0.018);
+      final angle = (2 * math.pi / count) * i + math.sin(seed) * 0.14;
+      final burst = Curves.easeOut.transform(t);
+      final sparkleCenter = anchor.translate(
+        math.cos(angle) * radius * burst,
+        math.sin(angle) * radius * burst * 0.7,
+      );
 
-      final rise = 10 + (i % 5) * 3.0;
-      final y = -((Curves.easeOut.transform(t) * rise) + (math.cos(seed * 2.2) * 4));
-      final x = math.sin(seed * 3.7) * 3;
-      final sparkleCenter = topAnchor.translate(baseOffset.dx + x, baseOffset.dy + y);
+      final sparkleRadius = 1.4 + (i % 4) * 0.9;
+      final sparklePaint = Paint()
+        ..color = Colors.white.withValues(alpha: alpha * (0.65 + (i % 3) * 0.1));
+      canvas.drawCircle(sparkleCenter, sparkleRadius, sparklePaint);
 
-      final radius = 2 + (i % 4) * 0.6;
-      final scale = 0.8 + (Curves.easeOut.transform(t) * 0.2);
-      final paint = Paint()..color = Colors.white.withValues(alpha: alpha * (0.6 + (i % 3) * 0.12));
-      canvas.drawCircle(sparkleCenter, radius * scale, paint);
+      final glowPaint = Paint()
+        ..color = WaterTheme.brightSparkle.withValues(alpha: alpha * 0.38)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawCircle(sparkleCenter, sparkleRadius * 1.8, glowPaint);
     }
   }
 
