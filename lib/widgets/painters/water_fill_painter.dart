@@ -51,7 +51,7 @@ class WaterFillPainter extends CustomPainter {
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
 
-    final curveDepth = isFull ? 0.0 : 8 + visualFill * 4;
+    final curveDepth = isFull ? 0.0 : 5 + visualFill * 3;
     final waterPath = isFull
         ? (Path()..addRect(innerRect.inflate(2)))
         : (Path()
@@ -73,61 +73,85 @@ class WaterFillPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          const Color(0x8CD9F5FF),
-          const Color(0xB288D6F9),
-          const Color(0xD563B6E7),
-          const Color(0xDD4B9CD5),
+          const Color(0xCCEAF9FF),
+          const Color(0xC28FD8FF),
+          const Color(0xCC5CB8EE),
+          const Color(0xD94593CC),
         ],
+        stops: const [0.0, 0.45, 0.76, 1.0],
       ).createShader(waterRect);
     canvas.drawPath(waterPath, fillPaint);
 
-    final refractionPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+    final globalWaterTint = Paint()
+      ..color = const Color(0xFF8BD4FF).withValues(alpha: 0.10);
+    canvas.drawPath(waterPath, globalWaterTint);
+
+    final depthShadowPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.65, 0.7),
+        radius: 0.95,
         colors: [
-          Colors.white.withValues(alpha: 0.20),
+          const Color(0xFF2F74A8).withValues(alpha: 0.14),
           Colors.transparent,
         ],
-      ).createShader(waterRect)
-      ..blendMode = BlendMode.screen;
-    canvas.drawPath(waterPath.shift(const Offset(-7, 0)), refractionPaint);
+      ).createShader(waterRect);
+    canvas.drawPath(waterPath, depthShadowPaint);
 
     if (isFull) {
       return;
     }
 
     final surfacePath = Path()
-      ..moveTo(innerRect.left + 16, waterTopY + 1)
-      ..quadraticBezierTo(centerX, waterTopY + curveDepth - 3, innerRect.right - 16, waterTopY + 1);
+      ..moveTo(innerRect.left + 14, waterTopY + 0.5)
+      ..quadraticBezierTo(centerX, waterTopY + curveDepth - 1, innerRect.right - 14, waterTopY + 0.5);
 
     final surfaceLinePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7
+      ..strokeWidth = 1.4
       ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
         colors: [
-          Colors.white.withValues(alpha: 0.16),
-          Colors.white.withValues(alpha: 0.10),
+          const Color(0xFFE2F8FF).withValues(alpha: 0.0),
+          const Color(0xFFEFFFFF).withValues(alpha: 0.26),
+          const Color(0xFFE2F8FF).withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromLTWH(innerRect.left, waterTopY, innerRect.width, 8));
     canvas.drawPath(surfacePath, surfaceLinePaint);
 
     final highlightRect = Rect.fromCenter(
-      center: Offset(centerX, waterTopY + curveDepth - 1),
-      width: innerRect.width * 0.48,
-      height: innerRect.height * 0.06,
+      center: Offset(centerX, waterTopY + curveDepth + 0.8),
+      width: innerRect.width * 0.62,
+      height: innerRect.height * 0.085,
     );
     final highlightPaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Colors.white.withValues(alpha: 0),
-          Colors.white.withValues(alpha: 0.14),
-          Colors.white.withValues(alpha: 0),
+          const Color(0xFFC7ECFF).withValues(alpha: 0),
+          const Color(0xFFE6F8FF).withValues(alpha: 0.20),
+          const Color(0xFFC7ECFF).withValues(alpha: 0),
         ],
       ).createShader(highlightRect);
     canvas.drawOval(highlightRect, highlightPaint);
+
+    final underBandRect = Rect.fromCenter(
+      center: Offset(centerX, waterTopY + curveDepth + 4),
+      width: innerRect.width * 0.65,
+      height: innerRect.height * 0.08,
+    );
+    final underBandPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          const Color(0xFF4F9FD5).withValues(alpha: 0),
+          const Color(0xFF4F9FD5).withValues(alpha: 0.12),
+          const Color(0xFF4F9FD5).withValues(alpha: 0),
+        ],
+      ).createShader(underBandRect);
+    canvas.drawOval(underBandRect, underBandPaint);
   }
 
   @override
