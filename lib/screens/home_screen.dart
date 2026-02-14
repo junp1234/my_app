@@ -11,6 +11,7 @@ import '../services/daily_totals_service.dart';
 import '../services/settings_repository.dart';
 import '../services/water_log_service.dart';
 import '../widgets/droplet_button.dart';
+import '../widgets/falling_droplet.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import 'history_screen.dart';
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _todayCount = 0;
   bool _canUndo = false;
   bool _wasGoalReached = false;
+  int _dropSeq = 0;
   final List<int> _intakeHistory = [];
 
   late final WaterLogService _waterLogService;
@@ -152,6 +154,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _rippleCtrl.forward(from: 0);
   }
 
+  void _triggerRipple() {
+    debugPrint('SPLASH -> start ripple');
+    _rippleCtrl
+      ..stop()
+      ..reset()
+      ..forward();
+  }
+
   Future<void> _maybeShowProfileOnFirstRun() async {
     final prefs = await SharedPreferences.getInstance();
     final done = prefs.getBool('profile_setup_done') ?? false;
@@ -215,15 +225,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     setState(() {
       _todayTotalMl = nextTotal;
       _todayCount = nextCount;
+      _dropSeq += 1;
       _canUndo = _intakeHistory.isNotEmpty;
       _syncWaterAnimation(animate: true, targetProgress: nextProgress);
     });
 
+    debugPrint('ADD pressed -> start drop seq=$_dropSeq total=$nextTotal goal=$goal');
+
     _dropCtrl
-      ..stop()
-      ..reset()
-      ..forward();
-    _rippleCtrl
       ..stop()
       ..reset()
       ..forward();
@@ -342,12 +351,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           GlassGauge(
                             progress: _animatedWaterLevel,
                             rippleT: _rippleCtrl.value,
-                            dropT: _dropCtrl.value,
+                            dropT: 0,
+                          ),
+                          FallingDroplet(
+                            controller: _dropCtrl,
+                            onSplash: _triggerRipple,
                           ),
                           RippleScreenOverlay(
                             size: 272,
                             progress: _animatedWaterLevel,
-                            burstT: 0,
+                            burstT: _rippleCtrl.value,
                           ),
                         ],
                       ),
