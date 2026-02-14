@@ -27,8 +27,8 @@ class RipplePainter extends CustomPainter {
         continue;
       }
 
-      final oldOpacity = (1 - ringT) * 0.28;
-      final rippleColor = Colors.white.withValues(alpha: (oldOpacity + 0.12).clamp(0.0, 1.0));
+      final rippleOpacity = ((1 - ringT) * 0.32).clamp(0.0, 1.0);
+      final rippleColor = Colors.white.withValues(alpha: rippleOpacity);
       final width = 14 + maxWidth * ringT;
       final height = width * 0.3;
       final ripplePaint = Paint()

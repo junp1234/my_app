@@ -22,7 +22,7 @@ class _CompletedOverlayState extends State<CompletedOverlay> with SingleTickerPr
   )..forward();
 
   final List<_BokehDot> _bokehDots = List.generate(46, (index) => _BokehDot.seeded(index));
-  final List<_SparkleCross> _sparkles = List.generate(20, (index) => _SparkleCross.seeded(index));
+  final List<_SparkleDot> _sparkles = List.generate(44, (index) => _SparkleDot.seeded(index));
 
   @override
   void dispose() {
@@ -106,7 +106,7 @@ class _CelebrationOverlayPainter extends CustomPainter {
   final double t;
   final double phase;
   final List<_BokehDot> bokehDots;
-  final List<_SparkleCross> sparkles;
+  final List<_SparkleDot> sparkles;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -116,6 +116,7 @@ class _CelebrationOverlayPainter extends CustomPainter {
     _paintRays(canvas, size, center, rayScale);
     _paintBokeh(canvas, size);
     _paintSparkles(canvas, size);
+    _paintGlassRimGlow(canvas, size, center);
     _paintGlitterSweep(canvas, size, center);
   }
 
@@ -160,17 +161,14 @@ class _CelebrationOverlayPainter extends CustomPainter {
   }
 
   void _paintBokeh(Canvas canvas, Size size) {
-    final wave = Curves.easeInOut.transform((t * 1.2).clamp(0.0, 1.0));
-
     for (final dot in bokehDots) {
-      final yLift = (dot.speed * (0.08 + wave * 0.18)) * size.height;
       final flicker = 0.6 + 0.4 * math.sin((t * 2 * math.pi) + dot.phase);
       final alpha = (dot.alpha * phase * flicker).clamp(0.0, 0.22);
       if (alpha <= 0.001) {
         continue;
       }
 
-      final position = Offset(dot.x * size.width, dot.y * size.height - yLift);
+      final position = Offset(dot.x * size.width, dot.y * size.height);
       final rect = Rect.fromCircle(center: position, radius: dot.radius * 1.7);
       final paint = Paint()
         ..blendMode = BlendMode.screen
@@ -188,26 +186,59 @@ class _CelebrationOverlayPainter extends CustomPainter {
 
   void _paintSparkles(Canvas canvas, Size size) {
     for (final sparkle in sparkles) {
-      final localT = ((t - sparkle.phase) * 2.2).clamp(0.0, 1.0);
+      final cycleT = (t + sparkle.phaseShift) % 1.0;
+      final localT = (cycleT / sparkle.duration).clamp(0.0, 1.0);
       if (localT <= 0) {
         continue;
       }
-      final blink = math.sin(localT * math.pi);
-      final opacity = (blink * 0.7 * phase).clamp(0.0, 0.7);
+
+      final fadeIn = Curves.easeOut.transform((localT / 0.25).clamp(0.0, 1.0));
+      final fadeOut = 1 - Curves.easeIn.transform(((localT - 0.64) / 0.36).clamp(0.0, 1.0));
+      final opacity = (fadeIn * fadeOut * 0.75 * phase).clamp(0.0, 0.75);
       if (opacity <= 0.001) {
         continue;
       }
 
-      final center = Offset(sparkle.x * size.width, sparkle.y * size.height - (localT * sparkle.rise * size.height));
-      final paint = Paint()
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = 1.2
-        ..blendMode = BlendMode.plus
-        ..color = Colors.white.withValues(alpha: opacity);
+      final driftX = math.sin((localT * math.pi * 2) + sparkle.phaseShift * 9) * sparkle.driftX;
+      final driftY = -localT * sparkle.rise;
+      final center = Offset(
+        sparkle.x * size.width + driftX,
+        sparkle.y * size.height + driftY,
+      );
 
-      canvas.drawLine(center.translate(-sparkle.size, 0), center.translate(sparkle.size, 0), paint);
-      canvas.drawLine(center.translate(0, -sparkle.size), center.translate(0, sparkle.size), paint);
+      final paint = Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: opacity),
+            const Color(0xFFAEDFFF).withValues(alpha: opacity * 0.65),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: sparkle.size));
+
+      canvas.drawCircle(center, sparkle.size, paint);
     }
+  }
+
+  void _paintGlassRimGlow(Canvas canvas, Size size, Offset center) {
+    final glowRect = Rect.fromCircle(center: center, radius: size.width * 0.26);
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10)
+      ..shader = SweepGradient(
+        colors: [
+          Colors.transparent,
+          Colors.white.withValues(alpha: 0.20 * phase),
+          const Color(0xFF8ED8FF).withValues(alpha: 0.22 * phase),
+          Colors.white.withValues(alpha: 0.14 * phase),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.2, 0.52, 0.82, 1.0],
+      ).createShader(glowRect);
+
+    canvas.drawArc(glowRect, -math.pi, math.pi * 2, false, glowPaint);
   }
 
   void _paintGlitterSweep(Canvas canvas, Size size, Offset center) {
@@ -240,7 +271,6 @@ class _BokehDot {
     required this.x,
     required this.y,
     required this.radius,
-    required this.speed,
     required this.alpha,
     required this.phase,
   });
@@ -251,7 +281,6 @@ class _BokehDot {
       x: random.nextDouble(),
       y: 0.24 + random.nextDouble() * 0.78,
       radius: 6 + random.nextDouble() * 54,
-      speed: 0.45 + random.nextDouble() * 0.55,
       alpha: 0.05 + random.nextDouble() * 0.17,
       phase: random.nextDouble() * math.pi * 2,
     );
@@ -260,34 +289,41 @@ class _BokehDot {
   final double x;
   final double y;
   final double radius;
-  final double speed;
   final double alpha;
   final double phase;
 }
 
-class _SparkleCross {
-  _SparkleCross({
+class _SparkleDot {
+  _SparkleDot({
     required this.x,
     required this.y,
     required this.size,
-    required this.phase,
+    required this.duration,
+    required this.phaseShift,
     required this.rise,
+    required this.driftX,
   });
 
-  factory _SparkleCross.seeded(int i) {
+  factory _SparkleDot.seeded(int i) {
     final random = math.Random(901 + i * 13);
-    return _SparkleCross(
-      x: 0.08 + random.nextDouble() * 0.84,
-      y: 0.34 + random.nextDouble() * 0.56,
-      size: 6 + random.nextDouble() * 12,
-      phase: random.nextDouble() * 0.62,
-      rise: 0.03 + random.nextDouble() * 0.05,
+    final distanceFromCenter = math.min(1.0, random.nextDouble() * random.nextDouble());
+    final horizontalSpread = (random.nextDouble() - 0.5) * (0.22 + distanceFromCenter * 0.76);
+    return _SparkleDot(
+      x: (0.5 + horizontalSpread).clamp(0.06, 0.94),
+      y: (0.40 + random.nextDouble() * (0.42 + distanceFromCenter * 0.12)).clamp(0.22, 0.90),
+      size: 1 + random.nextDouble() * 5,
+      duration: 0.52 + random.nextDouble() * 0.35,
+      phaseShift: random.nextDouble(),
+      rise: 6 + random.nextDouble() * 22,
+      driftX: 2 + random.nextDouble() * 10,
     );
   }
 
   final double x;
   final double y;
   final double size;
-  final double phase;
+  final double duration;
+  final double phaseShift;
   final double rise;
+  final double driftX;
 }

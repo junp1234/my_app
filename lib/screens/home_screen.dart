@@ -135,6 +135,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _syncWaterAnimation(animate: animate, targetProgress: progress);
     });
     _evaluateCompletedOverlay(previousTotal, total);
+    debugPrint('COMPLETED: ${total >= _dailyGoalMl}');
     debugPrint('HOME total=$_todayTotalMl goal=$_dailyGoalMl progress=$progress undoCount=$count');
   }
 
@@ -251,6 +252,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final addMl = _settings.stepMl;
     await _waterLogService.add(addMl);
     await _refreshTodayState(animate: true);
+    debugPrint('RIPPLE: triggered at level=${_computeProgress().toStringAsFixed(3)}');
 
     _rippleCtrl.forward(from: 0);
     _shakeCtrl.forward(from: 0);
@@ -314,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final goal = _dailyGoalMl;
     final double progress = goal <= 0 ? 0.0 : (_todayTotalMl / goal).clamp(0.0, 1.0).toDouble();
+    final bool isCompleted = _todayTotalMl >= goal && goal > 0;
     debugPrint('HOME total=$_todayTotalMl goal=$goal progress=$progress undoCount=$_todayCount');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
@@ -323,14 +326,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       body: Stack(
         children: [
           Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFF2F2F7),
-                  Color(0xFFFEFEFF),
-                ],
+                colors: isCompleted
+                    ? const [
+                        Color(0xFF2F8FCE),
+                        Color(0xFF63B8E8),
+                      ]
+                    : const [
+                        Color(0xFFF2F2F7),
+                        Color(0xFFFEFEFF),
+                      ],
               ),
             ),
           ),
