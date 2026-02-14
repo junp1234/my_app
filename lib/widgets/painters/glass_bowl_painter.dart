@@ -70,24 +70,26 @@ class GlassBowlPainter extends CustomPainter {
       ..blendMode = BlendMode.screen;
     canvas.drawOval(innerRect.shift(const Offset(-6, 1)), leftRefraction);
 
-    final topHighlightRect = Rect.fromCenter(
-      center: Offset(center.dx + outerRect.width * 0.07, outerRect.top + outerRect.height * 0.23),
-      width: outerRect.width * 0.62,
-      height: outerRect.height * 0.29,
-    );
-
-    final topHighlight = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          const Color(0xFFDDF6FF).withValues(alpha: 0.24),
-          const Color(0xFFC7EAFF).withValues(alpha: 0.12),
-          Colors.transparent,
-        ],
-        stops: const [0.0, 0.6, 1.0],
-      ).createShader(topHighlightRect);
-    canvas.drawOval(topHighlightRect, topHighlight);
+    // NOTE: Top-half oval highlight intentionally disabled.
+    // This was the source of the bright ellipse that remained on the glass.
+    // final topHighlightRect = Rect.fromCenter(
+    //   center: Offset(center.dx + outerRect.width * 0.07, outerRect.top + outerRect.height * 0.23),
+    //   width: outerRect.width * 0.62,
+    //   height: outerRect.height * 0.29,
+    // );
+    //
+    // final topHighlight = Paint()
+    //   ..shader = LinearGradient(
+    //     begin: Alignment.topLeft,
+    //     end: Alignment.bottomRight,
+    //     colors: [
+    //       const Color(0xFFDDF6FF).withValues(alpha: 0.24),
+    //       const Color(0xFFC7EAFF).withValues(alpha: 0.12),
+    //       Colors.transparent,
+    //     ],
+    //     stops: const [0.0, 0.6, 1.0],
+    //   ).createShader(topHighlightRect);
+    // canvas.drawOval(topHighlightRect, topHighlight);
 
     final sideSpecular = Paint()
       ..color = const Color(0xFFDEF3FF).withValues(alpha: 0.2)
