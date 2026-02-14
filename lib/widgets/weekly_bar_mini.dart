@@ -13,7 +13,7 @@ class WeeklyProgressRow extends StatelessWidget {
   final int goalMl;
 
   static const _weekdayLabels = ['月', '火', '水', '木', '金', '土', '日'];
-  static const _barAreaHeight = 72.0;
+  static const _barAreaHeight = 84.0;
   static const _maxBarHeight = 56.0;
 
   @override
@@ -42,7 +42,7 @@ class WeeklyProgressRow extends StatelessWidget {
         side: const BorderSide(color: AppColors.border),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,105 +70,96 @@ class WeeklyProgressRow extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             SizedBox(
-              height: 92,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: _barAreaHeight,
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: List.generate(days.length, (index) {
-                          final day = days[index];
-                          final total = totals[index];
-                          final progress = goalMl <= 0 ? 0.0 : (total / goalMl).toDouble();
-                          final isToday = day == today;
-                          final achieved = progress >= 1.0;
-                          final midProgress = progress >= 0.5 && progress < 1.0;
-                          final barOpacity = achieved ? 1.0 : (midProgress ? 0.8 : 0.35);
-                          final minHeight = progress < 0.5
-                              ? (_maxBarHeight * 0.2)
-                              : (_maxBarHeight * 0.35);
-                          final h = (progress == 0 ? minHeight : (_maxBarHeight * progress))
-                              .clamp(0.0, _maxBarHeight);
+              height: _barAreaHeight,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(days.length, (index) {
+                    final day = days[index];
+                    final total = totals[index];
+                    final progress = goalMl <= 0 ? 0.0 : (total / goalMl).toDouble();
+                    final isToday = day == today;
+                    final achieved = progress >= 1.0;
+                    final midProgress = progress >= 0.5 && progress < 1.0;
+                    final barOpacity = achieved ? 1.0 : (midProgress ? 0.8 : 0.35);
+                    final minHeight = progress < 0.5
+                        ? (_maxBarHeight * 0.2)
+                        : (_maxBarHeight * 0.35);
+                    final h = (progress == 0 ? minHeight : (_maxBarHeight * progress))
+                        .clamp(0.0, _maxBarHeight);
 
-                          return Expanded(
-                            child: Stack(
-                              alignment: Alignment.bottomCenter,
-                              children: [
-                                Container(
-                                  width: 18,
-                                  height: _maxBarHeight,
-                                  alignment: Alignment.bottomCenter,
-                                  decoration: BoxDecoration(
-                                    border: isToday
-                                        ? Border.all(color: AppColors.primary, width: 1.1)
-                                        : null,
-                                    borderRadius: BorderRadius.circular(9),
-                                  ),
-                                  child: Align(
-                                    alignment: Alignment.bottomCenter,
-                                    child: Container(
-                                      width: 12,
-                                      height: h,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(alpha: barOpacity),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: _maxBarHeight + 4,
-                                  child: SizedBox(
-                                    height: 16,
-                                    child: achieved
-                                        ? const Icon(
-                                            Icons.check_circle,
-                                            size: 15,
-                                            color: AppColors.primary,
-                                          )
-                                        : midProgress
-                                            ? Container(
-                                                width: 6,
-                                                height: 6,
-                                                decoration: const BoxDecoration(
-                                                  color: AppColors.primary,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              )
-                                            : const SizedBox.shrink(),
-                                  ),
-                                ),
-                              ],
+                    return Expanded(
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          Container(
+                            width: 18,
+                            height: _maxBarHeight,
+                            alignment: Alignment.bottomCenter,
+                            decoration: BoxDecoration(
+                              border: isToday
+                                  ? Border.all(color: AppColors.primary, width: 1.1)
+                                  : null,
+                              borderRadius: BorderRadius.circular(9),
                             ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: List.generate(days.length, (index) {
-                      final day = days[index];
-
-                      return Expanded(
-                        child: Center(
-                          child: Text(
-                            _weekdayLabels[day.weekday - 1],
-                            style: const TextStyle(fontSize: 11, color: AppColors.subtext),
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Container(
+                                width: 12,
+                                height: h,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: barOpacity),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-                  ),
-                ],
+                          Positioned(
+                            bottom: _maxBarHeight + 4,
+                            child: SizedBox(
+                              height: 16,
+                              child: achieved
+                                  ? const Icon(
+                                      Icons.check_circle,
+                                      size: 15,
+                                      color: AppColors.primary,
+                                    )
+                                  : midProgress
+                                      ? Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.primary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
+            Row(
+              children: List.generate(days.length, (index) {
+                final day = days[index];
+
+                return Expanded(
+                  child: Center(
+                    child: Text(
+                      _weekdayLabels[day.weekday - 1],
+                      style: const TextStyle(fontSize: 11, color: AppColors.subtext),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
             Text(
               '達成 $achievedCount/7',
               style: const TextStyle(
