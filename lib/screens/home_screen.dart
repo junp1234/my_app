@@ -59,8 +59,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     vsync: this,
     duration: const Duration(milliseconds: 1050),
   )..addStatusListener((status) {
-      if (status == AnimationStatus.completed && mounted) {
-        setState(() {});
+      if (status == AnimationStatus.completed) {
+        _celebrationCtrl.value = 0;
+        if (mounted) {
+          setState(() {});
+        }
       }
     });
 
@@ -151,6 +154,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final nowReached = totalMl >= goalMl;
     if (!_wasGoalReached && nowReached) {
+      final total = totalMl;
+      final goal = goalMl;
+      debugPrint('CELEBRATION start total=$total goal=$goal');
       _triggerGoalCelebration();
     }
     _wasGoalReached = nowReached;
@@ -295,15 +301,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
-    final celebrationBg = CurvedAnimation(
-      parent: _celebrationCtrl,
-      curve: const Interval(0.0, 0.78, curve: Curves.easeOut),
-    ).value;
     final celebrationBurst = CurvedAnimation(
       parent: _celebrationCtrl,
       curve: const Interval(0.0, 0.40, curve: Curves.easeOutCubic),
     ).value;
-    final shouldShowCelebration = _celebrationCtrl.isAnimating;
+    final shouldShowCelebration = _celebrationCtrl.isAnimating || _celebrationCtrl.value > 0;
 
     return Scaffold(
       body: Stack(
@@ -325,11 +327,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
           ),
-          if (shouldShowCelebration)
-            CompletedOverlay(
-              progress: _celebrationCtrl.value,
-              backgroundStrength: celebrationBg,
-            ),
           SafeArea(
             child: Stack(
               children: [
@@ -430,6 +427,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
+          if (shouldShowCelebration)
+            CompletedOverlay(
+              animation: _celebrationCtrl,
+              waterColor: WaterTheme.deepBlue,
+            ),
         ],
       ),
     );
