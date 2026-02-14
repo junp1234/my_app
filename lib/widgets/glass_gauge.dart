@@ -6,6 +6,7 @@ import 'painters/glass_bowl_painter.dart';
 import 'painters/ripple_painter.dart';
 import 'painters/water_fill_painter.dart';
 import 'shapes/teardrop_path.dart';
+import 'water_surface_wobble.dart';
 
 class GlassGauge extends StatelessWidget {
   const GlassGauge({
@@ -14,6 +15,7 @@ class GlassGauge extends StatelessWidget {
     required this.rippleT,
     required this.shakeT,
     required this.dropT,
+    required this.wobbleT,
     this.extraRippleLayer = false,
     this.size = 272,
   });
@@ -22,6 +24,7 @@ class GlassGauge extends StatelessWidget {
   final double rippleT;
   final double shakeT;
   final double dropT;
+  final double wobbleT;
   final bool extraRippleLayer;
   final double size;
 
@@ -38,6 +41,7 @@ class GlassGauge extends StatelessWidget {
             progress: progress,
             rippleT: rippleT,
             dropT: dropT,
+            wobbleT: wobbleT,
             extraRippleLayer: extraRippleLayer,
           ),
         ),
@@ -51,12 +55,14 @@ class _GlassGaugePainter extends CustomPainter {
     required this.progress,
     required this.rippleT,
     required this.dropT,
+    required this.wobbleT,
     required this.extraRippleLayer,
   });
 
   final double progress;
   final double rippleT;
   final double dropT;
+  final double wobbleT;
   final bool extraRippleLayer;
 
   @override
@@ -82,18 +88,49 @@ class _GlassGaugePainter extends CustomPainter {
     canvas.clipPath(Path()..addOval(innerRect));
     WaterFillPainter(innerRect: innerRect, progress: progress).paint(canvas, size);
 
+    final isFull = WaterFillPainter.isFull(progress);
     final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
-    final rippleCenter = Offset(center.dx, waterTopY + 6);
-    final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
-    canvas.save();
-    canvas.clipPath(waterPath);
-    RipplePainter(
-      t: rippleT,
-      center: rippleCenter,
-      maxWidth: innerRect.width * 0.42,
-      extraLayer: extraRippleLayer,
-    ).paint(canvas, size);
-    canvas.restore();
+
+    if (isFull) {
+      final wobblePainter = WaterSurfaceWobblePainter(
+        waterRect: Rect.fromLTRB(innerRect.left, innerRect.top, innerRect.right, innerRect.bottom),
+        t: wobbleT,
+      );
+      final wobbleWaterPath = wobblePainter.buildWaterRegionPath();
+
+      canvas.save();
+      canvas.clipPath(wobbleWaterPath);
+
+      final innerReflection = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.11),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.55],
+        ).createShader(WaterFillPainter.waterGradientRectForTop(innerRect, innerRect.top));
+      canvas.drawRect(innerRect, innerReflection);
+      canvas.restore();
+
+      canvas.save();
+      canvas.clipPath(wobbleWaterPath);
+      wobblePainter.paint(canvas, size);
+      canvas.restore();
+    } else {
+      final rippleCenter = Offset(center.dx, waterTopY + 6);
+      final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
+      canvas.save();
+      canvas.clipPath(waterPath);
+      RipplePainter(
+        t: rippleT,
+        center: rippleCenter,
+        maxWidth: innerRect.width * 0.42,
+        extraLayer: extraRippleLayer,
+      ).paint(canvas, size);
+      canvas.restore();
+    }
 
     _paintFallingDrop(canvas, size, waterTopY);
     canvas.restore();
@@ -137,6 +174,7 @@ class _GlassGaugePainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.rippleT != rippleT ||
         oldDelegate.dropT != dropT ||
+        oldDelegate.wobbleT != wobbleT ||
         oldDelegate.extraRippleLayer != extraRippleLayer;
   }
 }
