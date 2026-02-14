@@ -18,13 +18,13 @@ class WaterFillPainter extends CustomPainter {
   static const double _innerTopPadding = 4;
   static const double _fullThreshold = 0.999;
 
-  static bool isFull(double progress) {
+  static bool isFullProgress(double progress) {
     return progress.clamp(0.0, 1.0).toDouble() >= _fullThreshold;
   }
 
   static double visualFillForProgress(double progress) {
     final clamped = progress.clamp(0.0, 1.0).toDouble();
-    if (isFull(clamped)) {
+    if (isFullProgress(clamped)) {
       return 1.0;
     }
     return lerpDouble(_minVisualFill, 1.0, clamped) ?? _minVisualFill;
@@ -32,7 +32,7 @@ class WaterFillPainter extends CustomPainter {
 
   static double waterTopYForProgress(Rect innerRect, double progress) {
     final clamped = progress.clamp(0.0, 1.0).toDouble();
-    if (isFull(clamped)) {
+    if (isFullProgress(clamped)) {
       return innerRect.top;
     }
     final visualFill = visualFillForProgress(clamped);
@@ -45,13 +45,13 @@ class WaterFillPainter extends CustomPainter {
 
   static Path waterPathForProgress(Rect innerRect, double progress) {
     final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
-    final isFull = isFull(clampedProgress);
+    final full = isFullProgress(clampedProgress);
     final visualFill = visualFillForProgress(clampedProgress);
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
-    final curveDepth = isFull ? 0.0 : 5 + visualFill * 3;
+    final curveDepth = full ? 0.0 : 5 + visualFill * 3;
 
-    return isFull
+    return full
         ? (Path()..addRect(innerRect.inflate(2)))
         : (Path()
             ..moveTo(innerRect.left - 2, innerRect.bottom + 2)
@@ -67,12 +67,12 @@ class WaterFillPainter extends CustomPainter {
     if (clampedProgress <= 0) {
       return;
     }
-    final isFull = isFull(clampedProgress);
+    final full = isFullProgress(clampedProgress);
     final visualFill = visualFillForProgress(clampedProgress);
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
 
-    final curveDepth = isFull ? 0.0 : 5 + visualFill * 3;
+    final curveDepth = full ? 0.0 : 5 + visualFill * 3;
     final waterPath = waterPathForProgress(innerRect, clampedProgress);
 
     final waterRect = waterGradientRectForTop(innerRect, waterTopY);
@@ -106,9 +106,9 @@ class WaterFillPainter extends CustomPainter {
       ).createShader(waterRect);
     canvas.drawPath(waterPath, depthShadowPaint);
 
-    _paintSurfaceGlitter(canvas, waterPath, waterTopY, centerX, isFull);
+    _paintSurfaceGlitter(canvas, waterPath, waterTopY, centerX, full);
 
-    if (isFull) {
+    if (full) {
       return;
     }
 
