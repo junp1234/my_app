@@ -66,6 +66,18 @@ class _GlassGaugePainter extends CustomPainter {
     final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
     final innerRect = outerRect.deflate(11);
 
+    final airVolumePaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.2, -0.28),
+        radius: 1.08,
+        colors: [
+          const Color(0xFFEFFCFF).withValues(alpha: 0.20),
+          const Color(0xFFCFE9FA).withValues(alpha: 0.08),
+          Colors.transparent,
+        ],
+      ).createShader(innerRect);
+    canvas.drawOval(innerRect, airVolumePaint);
+
     canvas.save();
     canvas.clipPath(Path()..addOval(innerRect));
     WaterFillPainter(innerRect: innerRect, progress: progress).paint(canvas, size);
@@ -105,9 +117,9 @@ class _GlassGaugePainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.65 * opacity),
-          const Color(0xCC7ACFFF).withValues(alpha: opacity),
-          const Color(0xE15FB9F1).withValues(alpha: opacity),
+          const Color(0xFFE9F8FF).withValues(alpha: 0.65 * opacity),
+          const Color(0xCC8ED8FF).withValues(alpha: opacity),
+          const Color(0xE058A8D8).withValues(alpha: opacity),
         ],
       ).createShader(dropRect);
     canvas.drawPath(dropPath, dropPaint);

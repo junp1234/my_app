@@ -14,83 +14,104 @@ class GlassBowlPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = outerRect.center;
-    final softShadowPath = Path()..addOval(outerRect.shift(const Offset(0, 10)));
-    canvas.drawShadow(softShadowPath, const Color(0x25000000), 24, false);
+    final baseShadowRect = Rect.fromCenter(
+      center: center.translate(0, outerRect.height * 0.56),
+      width: outerRect.width * 0.7,
+      height: outerRect.height * 0.22,
+    );
+    final baseShadowPaint = Paint()
+      ..color = const Color(0xFF6B85A2).withValues(alpha: 0.16)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
+    canvas.drawOval(baseShadowRect, baseShadowPaint);
 
     final bowlFillPaint = Paint()
       ..shader = RadialGradient(
         center: const Alignment(-0.25, -0.3),
         radius: 1.0,
         colors: [
-          Colors.white.withValues(alpha: 0.22),
-          const Color(0x91EDF5FF),
-          const Color(0x3FD7E4F3),
+          const Color(0xFFEFFAFF).withValues(alpha: 0.26),
+          const Color(0xFFCCEAFB).withValues(alpha: 0.14),
+          const Color(0xFF9BC6E3).withValues(alpha: 0.07),
         ],
+        stops: const [0.0, 0.55, 1.0],
       ).createShader(outerRect);
     canvas.drawOval(outerRect, bowlFillPaint);
 
     final outerStrokePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
+      ..strokeWidth = 2.6
       ..shader = SweepGradient(
         transform: const GradientRotation(-pi / 2),
         colors: [
-          Colors.white.withValues(alpha: 0.95),
-          const Color(0x9EDDEBFA),
-          const Color(0x80C6D7EA),
-          Colors.white.withValues(alpha: 0.86),
+          const Color(0xFFD8EEFF).withValues(alpha: 0.42),
+          const Color(0xFFB7D6EC).withValues(alpha: 0.28),
+          const Color(0xFFAECFE8).withValues(alpha: 0.26),
+          const Color(0xFFD8EEFF).withValues(alpha: 0.4),
         ],
       ).createShader(outerRect);
     canvas.drawOval(outerRect, outerStrokePaint);
 
     final innerStrokePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.8
-      ..color = Colors.white.withValues(alpha: 0.45);
-    canvas.drawOval(innerRect.inflate(2), innerStrokePaint);
+      ..strokeWidth = 1.5
+      ..color = const Color(0xFFEFFFFF).withValues(alpha: 0.22);
+    canvas.drawOval(innerRect.inflate(1.4), innerStrokePaint);
 
     final leftRefraction = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Colors.white.withValues(alpha: 0.24),
-          Colors.white.withValues(alpha: 0.02),
+          const Color(0xFFD9F3FF).withValues(alpha: 0.18),
+          const Color(0xFFD9F3FF).withValues(alpha: 0.04),
           Colors.transparent,
         ],
       ).createShader(innerRect)
       ..blendMode = BlendMode.screen;
-    canvas.drawOval(innerRect.shift(const Offset(-8, 2)), leftRefraction);
+    canvas.drawOval(innerRect.shift(const Offset(-6, 1)), leftRefraction);
 
     final topHighlightRect = Rect.fromCenter(
-      center: Offset(center.dx, outerRect.top + outerRect.height * 0.22),
-      width: outerRect.width * 0.8,
-      height: outerRect.height * 0.2,
+      center: Offset(center.dx + outerRect.width * 0.07, outerRect.top + outerRect.height * 0.23),
+      width: outerRect.width * 0.62,
+      height: outerRect.height * 0.29,
     );
 
     final topHighlight = Paint()
       ..shader = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
         colors: [
-          Colors.white.withValues(alpha: 0.0),
-          Colors.white.withValues(alpha: 0.18),
-          Colors.white.withValues(alpha: 0.0),
+          const Color(0xFFDDF6FF).withValues(alpha: 0.24),
+          const Color(0xFFC7EAFF).withValues(alpha: 0.12),
+          Colors.transparent,
         ],
+        stops: const [0.0, 0.6, 1.0],
       ).createShader(topHighlightRect);
     canvas.drawOval(topHighlightRect, topHighlight);
 
     final sideSpecular = Paint()
-      ..color = Colors.white.withValues(alpha: 0.35)
+      ..color = const Color(0xFFDEF3FF).withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 3;
+      ..strokeWidth = 2.2;
     canvas.drawArc(
       Rect.fromCenter(center: center.translate(-24, -18), width: outerRect.width * 0.9, height: outerRect.height * 0.8),
       pi * 0.95,
       pi * 0.28,
       false,
       sideSpecular,
+    );
+
+    final lowerRimShade = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.9
+      ..color = const Color(0xFF7DA5C8).withValues(alpha: 0.16);
+    canvas.drawArc(
+      innerRect.inflate(0.4),
+      pi * 0.18,
+      pi * 0.64,
+      false,
+      lowerRimShade,
     );
   }
 
