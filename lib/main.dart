@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'data/intake_repository.dart';
 import 'models/app_settings.dart';
@@ -8,6 +9,7 @@ import 'services/settings_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ja_JP', null);
   await NotificationService.instance.initialize();
   runApp(const DropGlassApp());
 }
