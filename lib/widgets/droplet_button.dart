@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class DropletButton extends StatelessWidget {
   const DropletButton({
@@ -18,10 +19,13 @@ class DropletButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveScale = isPressed && scale > 0.97 ? 0.96 : scale;
+    final effectiveScale = isPressed ? 0.96 : scale;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       onLongPressStart: onLongPressStart,
       onLongPressEnd: onLongPressEnd,
       child: Transform.scale(
@@ -46,131 +50,69 @@ class _DropletPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final dropletPath = _buildDropletPath(size);
+    final highlightStrength = isPressed ? 0.82 : 1.0;
 
     canvas.drawShadow(
       dropletPath,
-      const Color(0xFF2E8FC7).withValues(alpha: isPressed ? 0.18 : 0.28),
-      isPressed ? 7 : 10,
-      false,
+      const Color(0xFF4B81AA).withValues(alpha: isPressed ? 0.12 : 0.18),
+      isPressed ? 8 : 10,
+      true,
     );
 
     canvas.save();
     canvas.clipPath(dropletPath);
 
-    final fillPaint = Paint()
+    final basePaint = Paint()
       ..shader = LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: const [
-          Color(0xFFEAF8FF),
-          Color(0xFFC8EBFF),
-          Color(0xFF8ED4F7),
+          Color(0xFFF4FBFF),
+          Color(0xFF8EDDFF),
+          Color(0xFF2E92D8),
         ],
-        stops: const [0.0, 0.48, 1.0],
+        stops: const [0.0, 0.55, 1.0],
       ).createShader(Offset.zero & size);
-    canvas.drawPath(dropletPath, fillPaint);
+    canvas.drawRect(Offset.zero & size, basePaint);
 
-    final upperLiftPath = Path()
-      ..moveTo(size.width * 0.31, size.height * 0.12)
-      ..cubicTo(
-        size.width * 0.20,
-        size.height * 0.20,
-        size.width * 0.17,
-        size.height * 0.43,
-        size.width * 0.28,
-        size.height * 0.61,
-      )
-      ..cubicTo(
-        size.width * 0.34,
-        size.height * 0.66,
-        size.width * 0.43,
-        size.height * 0.63,
-        size.width * 0.45,
-        size.height * 0.55,
-      )
-      ..cubicTo(
-        size.width * 0.33,
-        size.height * 0.46,
-        size.width * 0.30,
-        size.height * 0.27,
-        size.width * 0.39,
-        size.height * 0.14,
-      )
-      ..close();
-    final upperLiftPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+    final depthPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.34, -0.42),
+        radius: 1.02,
         colors: [
-          Colors.white.withValues(alpha: 0.45),
-          const Color(0xFFD9F3FF).withValues(alpha: 0.28),
+          Colors.white.withValues(alpha: 0.16 * highlightStrength),
+          const Color(0xFF3A9CD9).withValues(alpha: 0.12),
+          const Color(0xFF1E76B5).withValues(alpha: 0.16),
         ],
-      ).createShader(upperLiftPath.getBounds());
-    canvas.drawPath(upperLiftPath, upperLiftPaint);
-
-    final innerDepthPath = Path()
-      ..moveTo(size.width * 0.60, size.height * 0.56)
-      ..cubicTo(
-        size.width * 0.74,
-        size.height * 0.56,
-        size.width * 0.84,
-        size.height * 0.72,
-        size.width * 0.78,
-        size.height * 0.86,
-      )
-      ..cubicTo(
-        size.width * 0.69,
-        size.height * 0.95,
-        size.width * 0.55,
-        size.height * 0.92,
-        size.width * 0.51,
-        size.height * 0.82,
-      )
-      ..cubicTo(
-        size.width * 0.58,
-        size.height * 0.76,
-        size.width * 0.62,
-        size.height * 0.66,
-        size.width * 0.60,
-        size.height * 0.56,
-      )
-      ..close();
-    final innerDepthPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Colors.transparent,
-          const Color(0xFF2E91C9).withValues(alpha: 0.17),
-        ],
-      ).createShader(innerDepthPath.getBounds());
-    canvas.drawPath(innerDepthPath, innerDepthPaint);
+        stops: const [0.0, 0.64, 1.0],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, depthPaint);
 
     final mainHighlightPath = Path()
-      ..moveTo(size.width * 0.34, size.height * 0.17)
+      ..moveTo(size.width * 0.40, size.height * 0.14)
       ..cubicTo(
-        size.width * 0.25,
-        size.height * 0.26,
+        size.width * 0.28,
+        size.height * 0.27,
         size.width * 0.23,
-        size.height * 0.42,
-        size.width * 0.30,
-        size.height * 0.57,
+        size.height * 0.50,
+        size.width * 0.31,
+        size.height * 0.67,
       )
       ..cubicTo(
-        size.width * 0.35,
+        size.width * 0.36,
+        size.height * 0.73,
+        size.width * 0.44,
+        size.height * 0.72,
+        size.width * 0.49,
         size.height * 0.64,
-        size.width * 0.43,
-        size.height * 0.64,
-        size.width * 0.47,
-        size.height * 0.57,
       )
       ..cubicTo(
         size.width * 0.40,
-        size.height * 0.48,
-        size.width * 0.38,
+        size.height * 0.52,
+        size.width * 0.37,
         size.height * 0.30,
-        size.width * 0.45,
-        size.height * 0.20,
+        size.width * 0.46,
+        size.height * 0.18,
       )
       ..close();
     final mainHighlightPaint = Paint()
@@ -178,90 +120,87 @@ class _DropletPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.42),
-          const Color(0xFFE8F8FF).withValues(alpha: 0.24),
+          Colors.white.withValues(alpha: 0.25 * highlightStrength),
+          const Color(0xFFDBF4FF).withValues(alpha: 0.18 * highlightStrength),
           Colors.transparent,
         ],
-        stops: const [0, 0.55, 1],
+        stops: const [0.0, 0.58, 1.0],
       ).createShader(mainHighlightPath.getBounds());
     canvas.drawPath(mainHighlightPath, mainHighlightPaint);
 
     final subHighlightPath = Path()
-      ..moveTo(size.width * 0.63, size.height * 0.70)
-      ..cubicTo(
-        size.width * 0.70,
-        size.height * 0.68,
-        size.width * 0.75,
-        size.height * 0.74,
-        size.width * 0.71,
-        size.height * 0.81,
-      )
-      ..cubicTo(
-        size.width * 0.66,
-        size.height * 0.85,
-        size.width * 0.59,
-        size.height * 0.82,
-        size.width * 0.58,
-        size.height * 0.75,
-      )
-      ..close();
+      ..addOval(
+        Rect.fromCenter(
+          center: Offset(size.width * 0.66, size.height * 0.77),
+          width: size.width * 0.22,
+          height: size.height * 0.12,
+        ),
+      );
     final subHighlightPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+      ..shader = RadialGradient(
+        center: const Alignment(-0.1, -0.1),
+        radius: 0.8,
         colors: [
-          Colors.white.withValues(alpha: 0.30),
-          const Color(0xFFE4F6FF).withValues(alpha: 0.16),
+          Colors.white.withValues(alpha: 0.16 * highlightStrength),
+          const Color(0xFFD8F3FF).withValues(alpha: 0.10 * highlightStrength),
+          Colors.transparent,
         ],
+        stops: const [0.0, 0.72, 1.0],
       ).createShader(subHighlightPath.getBounds());
     canvas.drawPath(subHighlightPath, subHighlightPaint);
 
     canvas.restore();
 
-    final outlinePaint = Paint()
+    final outerOutlinePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
-      ..color = const Color(0xFFEAF8FF).withValues(alpha: 0.72);
-    canvas.drawPath(dropletPath, outlinePaint);
+      ..color = const Color(0xFFDDF4FF).withValues(alpha: 0.50);
+    canvas.drawPath(dropletPath, outerOutlinePaint);
+
+    final innerOutlinePath = _buildDropletPath(size).shift(const Offset(0, 0.8));
+    final innerOutlinePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..color = Colors.white.withValues(alpha: 0.24);
+    canvas.drawPath(innerOutlinePath, innerOutlinePaint);
   }
 
   Path _buildDropletPath(Size size) {
     final centerX = size.width * 0.5;
-    final topY = size.height * 0.04;
 
     return Path()
-      ..moveTo(centerX, topY)
+      ..moveTo(centerX, size.height * 0.06)
       ..cubicTo(
-        size.width * 0.34,
-        size.height * 0.09,
+        size.width * 0.39,
+        size.height * 0.10,
+        size.width * 0.22,
+        size.height * 0.30,
         size.width * 0.20,
-        size.height * 0.28,
-        size.width * 0.18,
-        size.height * 0.50,
+        size.height * 0.52,
       )
       ..cubicTo(
-        size.width * 0.16,
-        size.height * 0.73,
-        size.width * 0.30,
-        size.height * 0.93,
+        size.width * 0.18,
+        size.height * 0.77,
+        size.width * 0.34,
+        size.height * 0.96,
         centerX,
         size.height,
       )
       ..cubicTo(
-        size.width * 0.70,
-        size.height * 0.93,
-        size.width * 0.84,
-        size.height * 0.73,
+        size.width * 0.66,
+        size.height * 0.96,
         size.width * 0.82,
-        size.height * 0.50,
+        size.height * 0.77,
+        size.width * 0.80,
+        size.height * 0.52,
       )
       ..cubicTo(
-        size.width * 0.80,
-        size.height * 0.28,
-        size.width * 0.66,
-        size.height * 0.09,
+        size.width * 0.78,
+        size.height * 0.30,
+        size.width * 0.61,
+        size.height * 0.10,
         centerX,
-        topY,
+        size.height * 0.06,
       )
       ..close();
   }
