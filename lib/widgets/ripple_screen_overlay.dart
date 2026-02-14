@@ -3,6 +3,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 class RippleScreenOverlay extends StatelessWidget {
   const RippleScreenOverlay({
     super.key,
@@ -63,14 +65,29 @@ class _RippleScreenPainter extends CustomPainter {
     final eased = Curves.easeOut.transform(progress);
     final radius = lerpDouble(0, maxR, eased)!;
     final pulse = math.sin(math.pi * progress).clamp(0.0, 1.0);
-    final alpha = (pulse * 0.22 * alphaMultiplier).clamp(0.0, 1.0);
-    final strokeWidth = lerpDouble(0.8, 2.4, pulse)!;
+    final alpha = (pulse * 0.3 * alphaMultiplier).clamp(0.0, 1.0);
+    final strokeWidth = lerpDouble(1.4, 3.0, pulse)!;
+
+    final shadowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth + 2.8
+      ..color = const Color(0xFF5D7286).withValues(alpha: alpha * 0.24)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
+
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth + 2.2
+      ..color = AppColors.primary.withValues(alpha: alpha * 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..color = const Color(0xFF7EC8FF).withValues(alpha: alpha);
+      ..color = AppColors.primaryStrong.withValues(alpha: (alpha * 0.9).clamp(0.0, 1.0))
+      ..blendMode = BlendMode.srcOver;
 
+    canvas.drawCircle(center, radius, shadowPaint);
+    canvas.drawCircle(center, radius * 0.994, glowPaint);
     canvas.drawCircle(center, radius, paint);
   }
 
