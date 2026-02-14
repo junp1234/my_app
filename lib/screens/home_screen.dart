@@ -7,9 +7,8 @@ import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
+import '../widgets/full_overlay.dart';
 import '../widgets/glass_gauge.dart';
-import '../widgets/watery_background.dart';
-import '../widgets/painters/glass_water_palette.dart';
 import '../services/daily_totals_service.dart';
 import '../services/water_log_service.dart';
 import 'history_screen.dart';
@@ -49,13 +48,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _waterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
-  late final AnimationController _fullScaleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
   bool _hasCelebratedFull = false;
-  double _previousProgress = 0.0;
-  double _backgroundTarget = 0.0;
-  bool _celebrationRippleActive = false;
   final GlobalKey _glassKey = GlobalKey();
 
   @override
@@ -72,9 +67,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..stop();
     _shakeCtrl
-      ..reset()
-      ..stop();
-    _fullScaleCtrl
       ..reset()
       ..stop();
     _maybeShowProfileOnFirstRun();
@@ -101,7 +93,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _waterCtrl.dispose();
     _rippleCtrl.dispose();
     _shakeCtrl.dispose();
-    _fullScaleCtrl.dispose();
     super.dispose();
   }
 
@@ -187,36 +178,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _checkFullCelebration(double progress) {
-    _backgroundTarget = progress == 1.0 ? 0.10 : 0.0;
-
-    if (progress >= 1.0 && _previousProgress < 1.0 && !_hasCelebratedFull) {
+    if (progress >= 1.0 && !_hasCelebratedFull) {
       _hasCelebratedFull = true;
-      _celebrationRippleActive = true;
-      _fullScaleCtrl.forward(from: 0);
       HapticFeedback.mediumImpact();
-      unawaited(
-        _rippleCtrl.forward(from: 0).whenComplete(() {
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _celebrationRippleActive = false;
-          });
-        }),
-      );
     } else if (progress < 1.0) {
       _hasCelebratedFull = false;
-      _celebrationRippleActive = false;
     }
-    _previousProgress = progress;
-  }
-
-  double get _bounceScale {
-    final t = _fullScaleCtrl.value;
-    if (t <= 0.5) {
-      return 1.0 + (Curves.easeOutBack.transform(t / 0.5) * 0.03);
-    }
-    return 1.03 - (Curves.easeOut.transform((t - 0.5) / 0.5) * 0.03);
   }
 
   Future<void> _addWater() async {
@@ -293,6 +260,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final goal = _dailyGoalMl;
     final double progress = goal <= 0 ? 0.0 : (_todayTotalMl / goal).clamp(0.0, 1.0).toDouble();
+    final bool isFull = goal > 0 && _todayTotalMl >= goal;
     debugPrint('HOME total=$_todayTotalMl goal=$goal progress=$progress undoCount=$_todayCount');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
@@ -301,29 +269,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Scaffold(
       body: Stack(
         children: [
-          Stack(
-            children: [
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFFF2F2F7),
-                      Color(0xFFFEFEFF),
-                    ],
-                  ),
-                ),
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFF2F2F7),
+                  Color(0xFFFEFEFF),
+                ],
               ),
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeOut,
-                opacity: _backgroundTarget,
-                child: WateryBackground(
-                  tintColor: GlassWaterPalette.fullBackgroundTint(),
-                ),
-              ),
-            ],
+            ),
           ),
           SafeArea(
             child: Stack(
@@ -346,22 +302,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 Center(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullScaleCtrl]),
+                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl]),
                     builder: (_, __) => GestureDetector(
                       onLongPress: _resetTodayTotal,
                       child: Stack(
                         key: _glassKey,
                         alignment: Alignment.center,
                         children: [
-                          Transform.scale(
-                            scale: _bounceScale,
-                            child: GlassGauge(
-                              progress: _animatedWaterLevel,
-                              rippleT: _rippleCtrl.value,
-                              shakeT: _shakeCtrl.value,
-                              dropT: _dropCtrl.value,
-                              extraRippleLayer: _celebrationRippleActive,
-                            ),
+                          GlassGauge(
+                            progress: _animatedWaterLevel,
+                            rippleT: _rippleCtrl.value,
+                            shakeT: _shakeCtrl.value,
+                            dropT: _dropCtrl.value,
                           ),
                         ],
                       ),
@@ -424,6 +376,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
+          if (isFull)
+            const FullOverlay(),
         ],
       ),
     );
