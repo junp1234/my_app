@@ -48,6 +48,7 @@ class _RippleScreenPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    debugPrint('RIPPLE paint value=$burstT');
     final center = size.center(Offset.zero);
     final bowlRadius = size.width * 0.39;
     final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
@@ -83,8 +84,8 @@ class _RippleScreenPainter extends CustomPainter {
     final eased = Curves.easeOut.transform(progress);
     final radius = lerpDouble(0, maxR, eased)!;
     final pulse = math.sin(math.pi * progress).clamp(0.0, 1.0);
-    final alpha = (pulse * 0.28 * alphaMultiplier).clamp(0.0, 1.0);
-    final strokeWidth = lerpDouble(1.6, 3.0, pulse)!;
+    final alpha = (pulse * 0.5 * alphaMultiplier).clamp(0.0, 1.0);
+    final strokeWidth = lerpDouble(2.2, 3.4, pulse)!;
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
