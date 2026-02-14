@@ -8,8 +8,8 @@ import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
-import '../widgets/ripple_screen_overlay.dart';
 import '../widgets/watery_background.dart';
+import '../widgets/painters/glass_water_palette.dart';
 import '../services/daily_totals_service.dart';
 import '../services/water_log_service.dart';
 import 'history_screen.dart';
@@ -50,7 +50,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
   late final AnimationController _fullScaleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 380));
-  late final AnimationController _fullRippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 980));
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
   bool _hasCelebratedFull = false;
@@ -58,8 +57,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double _backgroundTarget = 0.0;
   bool _celebrationRippleActive = false;
   final GlobalKey _glassKey = GlobalKey();
-  final GlobalKey _overlayKey = GlobalKey();
-  Offset? _rippleCenter;
 
   @override
   void initState() {
@@ -78,9 +75,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..stop();
     _fullScaleCtrl
-      ..reset()
-      ..stop();
-    _fullRippleCtrl
       ..reset()
       ..stop();
     _maybeShowProfileOnFirstRun();
@@ -108,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _rippleCtrl.dispose();
     _shakeCtrl.dispose();
     _fullScaleCtrl.dispose();
-    _fullRippleCtrl.dispose();
     super.dispose();
   }
 
@@ -194,14 +187,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _checkFullCelebration(double progress) {
-    _backgroundTarget = progress == 1.0 ? 1.0 : 0.0;
+    _backgroundTarget = progress == 1.0 ? 0.10 : 0.0;
 
     if (progress >= 1.0 && _previousProgress < 1.0 && !_hasCelebratedFull) {
       _hasCelebratedFull = true;
       _celebrationRippleActive = true;
-      _updateRippleCenter();
       _fullScaleCtrl.forward(from: 0);
-      _fullRippleCtrl.forward(from: 0);
       HapticFeedback.mediumImpact();
       unawaited(
         _rippleCtrl.forward(from: 0).whenComplete(() {
@@ -218,31 +209,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _celebrationRippleActive = false;
     }
     _previousProgress = progress;
-  }
-
-  void _updateRippleCenter() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final overlayContext = _overlayKey.currentContext;
-      final glassContext = _glassKey.currentContext;
-      if (!mounted || overlayContext == null || glassContext == null) {
-        return;
-      }
-
-      final overlayBox = overlayContext.findRenderObject() as RenderBox?;
-      final glassBox = glassContext.findRenderObject() as RenderBox?;
-      if (overlayBox == null || glassBox == null) {
-        return;
-      }
-
-      final glassCenterGlobal = glassBox.localToGlobal(glassBox.size.center(Offset.zero));
-      final center = overlayBox.globalToLocal(glassCenterGlobal);
-      if (_rippleCenter == center) {
-        return;
-      }
-      setState(() {
-        _rippleCenter = center;
-      });
-    });
   }
 
   double get _bounceScale {
@@ -332,11 +298,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
-    _updateRippleCenter();
-
     return Scaffold(
       body: Stack(
-        key: _overlayKey,
         children: [
           Stack(
             children: [
@@ -356,7 +319,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 duration: const Duration(milliseconds: 500),
                 curve: Curves.easeOut,
                 opacity: _backgroundTarget,
-                child: const WateryBackground(),
+                child: WateryBackground(
+                  tintColor: GlassWaterPalette.fullBackgroundTint(),
+                ),
               ),
             ],
           ),
@@ -457,18 +422,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ],
-            ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _fullRippleCtrl,
-                builder: (_, __) => RippleScreenOverlay(
-                  t: _fullRippleCtrl,
-                  center: _rippleCenter,
-                  enabled: _fullRippleCtrl.value > 0 && _fullRippleCtrl.value < 1,
-                ),
-              ),
             ),
           ),
         ],

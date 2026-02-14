@@ -167,6 +167,8 @@ class _DropletPainter extends CustomPainter {
 
   Path _buildDropletPath(Size size) {
     final centerX = size.width * 0.5;
+    final bottomY = size.height * 0.95;
+    final bottomRadius = Radius.elliptical(size.width * 0.13, size.height * 0.09);
 
     return Path()
       ..moveTo(centerX, size.height * 0.06)
@@ -181,14 +183,19 @@ class _DropletPainter extends CustomPainter {
       ..cubicTo(
         size.width * 0.18,
         size.height * 0.77,
-        size.width * 0.34,
-        size.height * 0.96,
-        centerX,
-        size.height,
+        size.width * 0.31,
+        size.height * 0.93,
+        size.width * 0.43,
+        bottomY,
+      )
+      ..arcToPoint(
+        Offset(size.width * 0.57, bottomY),
+        radius: bottomRadius,
+        clockwise: false,
       )
       ..cubicTo(
-        size.width * 0.66,
-        size.height * 0.96,
+        size.width * 0.69,
+        size.height * 0.93,
         size.width * 0.82,
         size.height * 0.77,
         size.width * 0.80,
