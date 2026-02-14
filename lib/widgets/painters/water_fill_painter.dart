@@ -40,6 +40,24 @@ class WaterFillPainter extends CustomPainter {
     return lerpDouble(minY, maxY, visualFill) ?? minY;
   }
 
+  static Path waterPathForProgress(Rect innerRect, double progress) {
+    final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
+    final isFull = _isFull(clampedProgress);
+    final visualFill = visualFillForProgress(clampedProgress);
+    final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
+    final centerX = innerRect.center.dx;
+    final curveDepth = isFull ? 0.0 : 5 + visualFill * 3;
+
+    return isFull
+        ? (Path()..addRect(innerRect.inflate(2)))
+        : (Path()
+            ..moveTo(innerRect.left - 2, innerRect.bottom + 2)
+            ..lineTo(innerRect.left - 2, waterTopY)
+            ..quadraticBezierTo(centerX, waterTopY + curveDepth, innerRect.right + 2, waterTopY)
+            ..lineTo(innerRect.right + 2, innerRect.bottom + 2)
+            ..close());
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
@@ -52,14 +70,7 @@ class WaterFillPainter extends CustomPainter {
     final centerX = innerRect.center.dx;
 
     final curveDepth = isFull ? 0.0 : 5 + visualFill * 3;
-    final waterPath = isFull
-        ? (Path()..addRect(innerRect.inflate(2)))
-        : (Path()
-            ..moveTo(innerRect.left - 2, innerRect.bottom + 2)
-            ..lineTo(innerRect.left - 2, waterTopY)
-            ..quadraticBezierTo(centerX, waterTopY + curveDepth, innerRect.right + 2, waterTopY)
-            ..lineTo(innerRect.right + 2, innerRect.bottom + 2)
-            ..close());
+    final waterPath = waterPathForProgress(innerRect, clampedProgress);
 
     final waterRect = Rect.fromLTWH(
       innerRect.left,
