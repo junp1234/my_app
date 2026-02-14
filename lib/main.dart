@@ -6,6 +6,7 @@ import 'models/app_settings.dart';
 import 'screens/home_screen.dart';
 import 'services/notification_service.dart';
 import 'services/settings_repository.dart';
+import 'theme/app_colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,7 +56,15 @@ class _DropGlassAppState extends State<DropGlassApp> {
       title: 'DropGlass',
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF7F8FB),
+        scaffoldBackgroundColor: AppColors.background,
+        cardColor: AppColors.surface,
+        dividerColor: AppColors.border,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primary,
+          primary: AppColors.primary,
+          surface: AppColors.surface,
+          outline: AppColors.border,
+        ),
       ),
       home: settings == null
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))

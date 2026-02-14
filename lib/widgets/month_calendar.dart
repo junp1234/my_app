@@ -115,7 +115,7 @@ class MonthCalendar extends StatelessWidget {
                   child: Container(
                     margin: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primarySoft : Colors.white,
+                      color: isSelected ? AppColors.primarySoft : AppColors.surface,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isToday ? AppColors.primary : Colors.transparent,
@@ -130,7 +130,7 @@ class MonthCalendar extends StatelessWidget {
                           style: TextStyle(
                             color: inMonth
                                 ? AppColors.text
-                                : AppColors.subtext.withOpacity(0.55),
+                                : AppColors.subtext.withValues(alpha: 0.55),
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                             fontSize: 12,
                           ),
@@ -142,7 +142,7 @@ class MonthCalendar extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: hasWater
-                                ? AppColors.primary.withOpacity(inMonth ? 0.7 : 0.35)
+                                ? AppColors.primary.withValues(alpha: inMonth ? 0.7 : 0.35)
                                 : Colors.transparent,
                           ),
                         ),
