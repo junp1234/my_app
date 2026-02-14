@@ -29,56 +29,33 @@ class WeeklyBarMini extends StatelessWidget {
     };
 
     final totals = days.map((day) => normalized[day] ?? 0).toList(growable: false);
-    final average = totals.isEmpty ? 0 : (totals.reduce((a, b) => a + b) / totals.length).round();
-    final hasAnyData = normalized.isNotEmpty;
+    final hasAnyData = totals.any((value) => value > 0);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+    return Card(
+      elevation: 0.2,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                '今週',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text),
-              ),
-              const Spacer(),
-              Text(
-                '平均 $average mL',
-                style: const TextStyle(fontSize: 13, color: AppColors.subtext),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (!hasAnyData)
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             const Text(
-              'まだ記録がありません',
-              style: TextStyle(color: AppColors.subtext, fontSize: 13),
-            )
-          else
+              'History',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text),
+            ),
+            const SizedBox(height: 12),
             SizedBox(
-              height: 90,
+              height: 92,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: List.generate(days.length, (index) {
                   final total = totals[index];
-                  final ratio = goalMl <= 0 ? 0.0 : (total / goalMl).clamp(0.0, 1.0);
-                  final barRatio = total == 0 ? 0.1 : ratio.toDouble();
-                  final day = days[index];
-                  final weekday = _weekdayLabels[day.weekday - 1];
+                  final ratio = goalMl <= 0 ? 0.0 : (total / goalMl).clamp(0.0, 1.0).toDouble();
+                  final heightFactor = total == 0 ? 0.08 : ratio.clamp(0.08, 1.0);
+                  final weekday = _weekdayLabels[days[index].weekday - 1];
 
                   return Expanded(
                     child: Column(
@@ -88,14 +65,14 @@ class WeeklyBarMini extends StatelessWidget {
                           child: Align(
                             alignment: Alignment.bottomCenter,
                             child: FractionallySizedBox(
-                              heightFactor: barRatio,
+                              heightFactor: heightFactor,
                               child: Container(
                                 width: 12,
                                 decoration: BoxDecoration(
                                   color: total == 0
-                                      ? AppColors.primary.withValues(alpha: 0.16)
+                                      ? AppColors.primary.withValues(alpha: 0.2)
                                       : AppColors.primary.withValues(alpha: 0.75),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                             ),
@@ -112,7 +89,15 @@ class WeeklyBarMini extends StatelessWidget {
                 }),
               ),
             ),
-        ],
+            if (!hasAnyData) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'まだ記録がありません。水を追加するとここに反映されます。',
+                style: TextStyle(color: AppColors.subtext, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
