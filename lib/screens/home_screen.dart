@@ -11,7 +11,7 @@ import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import '../widgets/watery_background.dart';
-import '../widgets/weekly_bar_mini.dart';
+import '../services/daily_totals_service.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 
@@ -37,7 +37,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late AppSettings _settings;
   int _displayTotalMl = 0;
   int _dailyGoalMl = 1500;
-  Map<DateTime, int> _weeklyTotals = {};
   bool _canUndo = false;
   Timer? _holdTimer;
   int _holdLevel = 1;
@@ -82,7 +81,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..stop();
     _loadPersisted();
-    unawaited(_loadWeeklyTotals());
     _maybeShowProfileOnFirstRun();
     debugPrint('HOME init: displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
     unawaited(_initializeHomeState());
@@ -140,23 +138,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'HOME persisted total loaded: $todayPersistedTotalMl '
       '(UI synced display=$_displayTotalMl goal=$_dailyGoalMl)',
     );
-  }
-
-  Future<void> _loadWeeklyTotals() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final result = <DateTime, int>{};
-    for (var i = 0; i < 7; i++) {
-      final day = DateTime(today.year, today.month, today.day - i);
-      final total = await widget.repository.getTotalForDay(day);
-      result[day] = total;
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _weeklyTotals = result;
-    });
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
@@ -284,13 +265,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final progress = goal <= 0 ? 0.0 : (nextTotal / goal).clamp(0.0, 1.0);
     debugPrint('tap add=$addMl displayTotal=$nextTotal goal=$goal progress=$progress');
     await prefs.setInt('totalMl', nextTotal);
+    await DailyTotalsService.addToToday(addMl);
 
     setState(() {
       _displayTotalMl = nextTotal;
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: true, targetProgress: progress.toDouble());
     });
-    unawaited(_loadWeeklyTotals());
 
     _rippleCtrl.forward(from: 0);
     _shakeCtrl.forward(from: 0);
@@ -310,6 +291,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final nextTotal = math.max(_displayTotalMl - latest.amountMl, 0);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('totalMl', nextTotal);
+    await DailyTotalsService.setToday(nextTotal);
     if (!mounted) {
       return;
     }
@@ -321,7 +303,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _canUndo = _displayTotalMl > 0;
       _syncWaterAnimation(animate: true, targetProgress: _computeProgress());
     });
-    unawaited(_loadWeeklyTotals());
 
     _rippleCtrl.value = 0;
   }
@@ -362,6 +343,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     await widget.repository.deleteTodayEvents();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('totalMl', 0);
+    await DailyTotalsService.setToday(0);
     HapticFeedback.mediumImpact();
     if (!mounted) {
       return;
@@ -372,7 +354,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _canUndo = false;
       _syncWaterAnimation(animate: true, targetProgress: 0.0);
     });
-    unawaited(_loadWeeklyTotals());
   }
 
   @override
@@ -415,16 +396,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           SafeArea(
             child: Stack(
               children: [
-              Positioned(
-                top: 8,
-                left: 8,
-                child: IconButton(onPressed: _openHistory, icon: const Icon(Icons.history)),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(onPressed: _openProfile, icon: const Icon(Icons.settings_outlined)),
-              ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: _openHistory,
+                        icon: const Icon(Icons.bar_chart_rounded),
+                      ),
+                      IconButton(
+                        onPressed: _openProfile,
+                        icon: const Icon(Icons.settings_outlined),
+                      ),
+                    ],
+                  ),
+                ),
                 Center(
                   child: AnimatedBuilder(
                     animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullScaleCtrl]),
@@ -500,15 +487,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 20,
-                  child: WeeklyBarMini(
-                    dailyTotals: _weeklyTotals,
-                    goalMl: _dailyGoalMl,
                   ),
                 ),
               ],
