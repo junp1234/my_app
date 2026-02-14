@@ -4,11 +4,15 @@ class FallingDroplet extends StatefulWidget {
   const FallingDroplet({
     super.key,
     required this.controller,
+    required this.start,
+    required this.end,
     required this.onSplash,
   });
 
   final AnimationController controller;
-  final VoidCallback onSplash;
+  final Offset start;
+  final Offset end;
+  final ValueChanged<Offset> onSplash;
 
   @override
   State<FallingDroplet> createState() => _FallingDropletState();
@@ -38,7 +42,7 @@ class _FallingDropletState extends State<FallingDroplet> {
 
   void _onStatusChanged(AnimationStatus status) {
     if (status == AnimationStatus.completed) {
-      widget.onSplash();
+      widget.onSplash(widget.end);
     }
   }
 
@@ -49,18 +53,19 @@ class _FallingDropletState extends State<FallingDroplet> {
       return const SizedBox.shrink();
     }
 
-    final y = Tween<double>(begin: -110, end: 88).transform(Curves.easeIn.transform(t));
+    final eased = Curves.easeIn.transform(t);
+    final dx = Tween<double>(begin: widget.start.dx, end: widget.end.dx).transform(eased);
+    final dy = Tween<double>(begin: widget.start.dy, end: widget.end.dy).transform(eased);
     final opacity = Tween<double>(begin: 1, end: 0.25).transform(t);
+    const dropletSize = 12.0;
 
-    return IgnorePointer(
-      child: Align(
-        alignment: const Alignment(0, -0.78),
+    return Positioned(
+      left: dx - dropletSize / 2,
+      top: dy - dropletSize / 2,
+      child: IgnorePointer(
         child: Opacity(
           opacity: opacity,
-          child: Transform.translate(
-            offset: Offset(0, y),
-            child: const Icon(Icons.water_drop_rounded, size: 38, color: Color(0xAA71CFFF)),
-          ),
+          child: const Icon(Icons.water_drop_rounded, size: dropletSize, color: Color(0xCC8ED8FF)),
         ),
       ),
     );
