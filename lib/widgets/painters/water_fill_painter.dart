@@ -22,6 +22,11 @@ class WaterFillPainter extends CustomPainter {
     return progress.clamp(0.0, 1.0).toDouble() >= _fullThreshold;
   }
 
+  // Backward-compatible alias for older call sites.
+  static bool isFull(double progress) {
+    return isFullProgress(progress);
+  }
+
   static double visualFillForProgress(double progress) {
     final clamped = progress.clamp(0.0, 1.0).toDouble();
     if (isFullProgress(clamped)) {
