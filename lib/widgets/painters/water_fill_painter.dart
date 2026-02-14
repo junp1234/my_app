@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -110,6 +111,8 @@ class WaterFillPainter extends CustomPainter {
       ).createShader(waterRect);
     canvas.drawPath(waterPath, depthShadowPaint);
 
+    _paintSurfaceGlitter(canvas, waterPath, waterTopY, centerX, isFull);
+
     if (isFull) {
       return;
     }
@@ -165,6 +168,40 @@ class WaterFillPainter extends CustomPainter {
         ],
       ).createShader(underBandRect);
     canvas.drawOval(underBandRect, underBandPaint);
+  }
+
+
+  void _paintSurfaceGlitter(Canvas canvas, Path waterPath, double waterTopY, double centerX, bool isFull) {
+    canvas.save();
+    canvas.clipPath(waterPath);
+
+    final speckPaint = Paint()
+      ..blendMode = BlendMode.screen
+      ..color = Colors.white.withValues(alpha: isFull ? 0.19 : 0.14);
+
+    for (var i = 0; i < 22; i++) {
+      final progressX = i / 21;
+      final x = lerpDouble(innerRect.left + 10, innerRect.right - 10, progressX) ?? centerX;
+      final wave = math.sin(i * 0.8) * 1.6;
+      final y = waterTopY + (isFull ? 3.6 : 2.4) + wave;
+      final radius = i % 4 == 0 ? 1.6 : 1.0;
+      canvas.drawCircle(Offset(x, y), radius, speckPaint);
+    }
+
+    final linePaint = Paint()
+      ..blendMode = BlendMode.screen
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.2
+      ..color = Colors.white.withValues(alpha: isFull ? 0.28 : 0.22);
+
+    for (var i = 0; i < 7; i++) {
+      final shift = i * 0.11;
+      final startX = lerpDouble(innerRect.left + 20, innerRect.right - 70, shift) ?? innerRect.left + 20;
+      final y = waterTopY + 1 + (i % 2 == 0 ? 0.9 : 2.2);
+      canvas.drawLine(Offset(startX, y), Offset(startX + 18 + (i % 3) * 8, y + 0.8), linePaint);
+    }
+
+    canvas.restore();
   }
 
   @override
