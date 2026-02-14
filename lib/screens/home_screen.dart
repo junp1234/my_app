@@ -10,8 +10,6 @@ import '../models/app_settings.dart';
 import '../services/daily_totals_service.dart';
 import '../services/settings_repository.dart';
 import '../services/water_log_service.dart';
-import '../theme/water_theme.dart';
-import '../widgets/completed_overlay.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/ripple_screen_overlay.dart';
@@ -55,17 +53,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _waterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
   late final AnimationController _shakeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
-  late final AnimationController _celebrationCtrl = AnimationController(
+  late final AnimationController _fullWobbleController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1050),
-  )..addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _celebrationCtrl.value = 0;
-        if (mounted) {
-          setState(() {});
-        }
-      }
-    });
+    duration: const Duration(milliseconds: 3200),
+  );
+  bool _isFullWobbleActive = false;
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
 
@@ -86,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _dailyGoalMl = widget.settings.dailyGoalMl;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
       _wasGoalReached = _todayTotalMl >= _dailyGoalMl;
+      _updateFullWobbleState(_todayTotalMl, _dailyGoalMl);
     }
   }
 
@@ -97,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _waterCtrl.dispose();
     _rippleCtrl.dispose();
     _shakeCtrl.dispose();
-    _celebrationCtrl.dispose();
+    _fullWobbleController.dispose();
     super.dispose();
   }
 
@@ -124,6 +117,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _canUndo = _intakeHistory.isNotEmpty;
       _syncWaterAnimation(animate: false, targetProgress: progress);
       _wasGoalReached = _todayTotalMl >= _dailyGoalMl;
+      _updateFullWobbleState(_todayTotalMl, _dailyGoalMl);
     });
   }
 
@@ -141,6 +135,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _todayCount = count;
       _canUndo = _intakeHistory.isNotEmpty;
       _syncWaterAnimation(animate: animate, targetProgress: progress);
+      _updateFullWobbleState(total, goal);
     });
 
     _handleGoalCrossing(totalMl: total, goalMl: goal);
@@ -154,9 +149,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final nowReached = totalMl >= goalMl;
     if (!_wasGoalReached && nowReached) {
-      final total = totalMl;
-      final goal = goalMl;
-      debugPrint('CELEBRATION start total=$total goal=$goal');
       _triggerGoalCelebration();
     }
     _wasGoalReached = nowReached;
@@ -169,7 +161,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..forward();
     _rippleCtrl.forward(from: 0);
-    _celebrationCtrl.forward(from: 0);
+  }
+
+  void _updateFullWobbleState(int totalMl, int goalMl) {
+    final isFull = goalMl > 0 && (totalMl / goalMl) >= 1.0;
+    if (isFull && !_isFullWobbleActive) {
+      debugPrint('FULL_WOBBLE on');
+      _fullWobbleController.repeat();
+      _isFullWobbleActive = true;
+    } else if (!isFull && _isFullWobbleActive) {
+      debugPrint('FULL_WOBBLE off');
+      _fullWobbleController
+        ..stop()
+        ..value = 0;
+      _isFullWobbleActive = false;
+    }
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
@@ -295,17 +301,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final goal = _dailyGoalMl;
-    final bool isCompleted = _todayTotalMl >= goal && goal > 0;
-
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
-
-    final celebrationBurst = CurvedAnimation(
-      parent: _celebrationCtrl,
-      curve: const Interval(0.0, 0.40, curve: Curves.easeOutCubic),
-    ).value;
-    final shouldShowCelebration = _celebrationCtrl.isAnimating || _celebrationCtrl.value > 0;
 
     return Scaffold(
       body: Stack(
@@ -315,15 +312,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: isCompleted
-                    ? const [
-                        WaterTheme.deepWater,
-                        WaterTheme.primaryWater,
-                      ]
-                    : const [
-                        Color(0xFFF2F2F7),
-                        Color(0xFFFEFEFF),
-                      ],
+                colors: const [
+                  Color(0xFFF2F2F7),
+                  Color(0xFFFEFEFF),
+                ],
               ),
             ),
           ),
@@ -348,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 Center(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _celebrationCtrl]),
+                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _shakeCtrl, _dropCtrl, _fullWobbleController]),
                     builder: (_, __) => GestureDetector(
                       onLongPress: _resetTodayTotal,
                       child: Stack(
@@ -359,12 +351,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             rippleT: _rippleCtrl.value,
                             shakeT: _shakeCtrl.value,
                             dropT: _dropCtrl.value,
-                            extraRippleLayer: celebrationBurst > 0.02,
+                            wobbleT: _fullWobbleController.value,
                           ),
                           RippleScreenOverlay(
                             size: 272,
                             progress: _animatedWaterLevel,
-                            burstT: celebrationBurst,
+                            burstT: 0,
                           ),
                         ],
                       ),
@@ -427,11 +419,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          if (shouldShowCelebration)
-            CompletedOverlay(
-              animation: _celebrationCtrl,
-              waterColor: WaterTheme.deepBlue,
-            ),
         ],
       ),
     );

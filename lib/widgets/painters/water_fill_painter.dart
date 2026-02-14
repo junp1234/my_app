@@ -18,13 +18,13 @@ class WaterFillPainter extends CustomPainter {
   static const double _innerTopPadding = 4;
   static const double _fullThreshold = 0.999;
 
-  static bool _isFull(double progress) {
+  static bool isFull(double progress) {
     return progress.clamp(0.0, 1.0).toDouble() >= _fullThreshold;
   }
 
   static double visualFillForProgress(double progress) {
     final clamped = progress.clamp(0.0, 1.0).toDouble();
-    if (_isFull(clamped)) {
+    if (isFull(clamped)) {
       return 1.0;
     }
     return lerpDouble(_minVisualFill, 1.0, clamped) ?? _minVisualFill;
@@ -32,7 +32,7 @@ class WaterFillPainter extends CustomPainter {
 
   static double waterTopYForProgress(Rect innerRect, double progress) {
     final clamped = progress.clamp(0.0, 1.0).toDouble();
-    if (_isFull(clamped)) {
+    if (isFull(clamped)) {
       return innerRect.top;
     }
     final visualFill = visualFillForProgress(clamped);
@@ -45,7 +45,7 @@ class WaterFillPainter extends CustomPainter {
 
   static Path waterPathForProgress(Rect innerRect, double progress) {
     final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
-    final isFull = _isFull(clampedProgress);
+    final isFull = isFull(clampedProgress);
     final visualFill = visualFillForProgress(clampedProgress);
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
@@ -67,7 +67,7 @@ class WaterFillPainter extends CustomPainter {
     if (clampedProgress <= 0) {
       return;
     }
-    final isFull = _isFull(clampedProgress);
+    final isFull = isFull(clampedProgress);
     final visualFill = visualFillForProgress(clampedProgress);
     final waterTopY = waterTopYForProgress(innerRect, clampedProgress);
     final centerX = innerRect.center.dx;
@@ -75,12 +75,7 @@ class WaterFillPainter extends CustomPainter {
     final curveDepth = isFull ? 0.0 : 5 + visualFill * 3;
     final waterPath = waterPathForProgress(innerRect, clampedProgress);
 
-    final waterRect = Rect.fromLTWH(
-      innerRect.left,
-      waterTopY - 20,
-      innerRect.width,
-      innerRect.bottom - waterTopY + 28,
-    );
+    final waterRect = waterGradientRectForTop(innerRect, waterTopY);
 
     final fillPaint = Paint()
       ..shader = LinearGradient(
@@ -168,6 +163,15 @@ class WaterFillPainter extends CustomPainter {
         ],
       ).createShader(underBandRect);
     canvas.drawOval(underBandRect, underBandPaint);
+  }
+
+  static Rect waterGradientRectForTop(Rect innerRect, double waterTopY) {
+    return Rect.fromLTWH(
+      innerRect.left,
+      waterTopY - 20,
+      innerRect.width,
+      innerRect.bottom - waterTopY + 28,
+    );
   }
 
 
