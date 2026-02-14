@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +11,7 @@ import '../widgets/glass_gauge.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import '../widgets/watery_background.dart';
 import '../services/daily_totals_service.dart';
+import '../services/water_log_service.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 
@@ -35,9 +35,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _settingsRepo = SettingsRepository.instance;
 
   late AppSettings _settings;
-  int _displayTotalMl = 0;
+  int _todayTotalMl = 0;
   int _dailyGoalMl = 1500;
+  int _todayCount = 0;
   bool _canUndo = false;
+  late final WaterLogService _waterLogService;
   Timer? _holdTimer;
   int _holdLevel = 1;
   bool _isHolding = false;
@@ -63,8 +65,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _settings = widget.settings;
-    _displayTotalMl = 0;
+    _todayTotalMl = 0;
     _dailyGoalMl = 1500;
+    _todayCount = 0;
     _canUndo = false;
     _waterCtrl.value = 0.0;
     _waterLevelTween = Tween<double>(begin: 0, end: 0);
@@ -80,9 +83,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _fullRippleCtrl
       ..reset()
       ..stop();
-    _loadPersisted();
     _maybeShowProfileOnFirstRun();
-    debugPrint('HOME init: displayTotal=$_displayTotalMl goal=$_dailyGoalMl');
+    _waterLogService = WaterLogService(widget.repository);
+    debugPrint('HOME init: total=$_todayTotalMl goal=$_dailyGoalMl');
     unawaited(_initializeHomeState());
   }
 
@@ -111,33 +114,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _initializeHomeState() async {
     final loadedSettings = await _settingsRepo.load();
+    final todayTotal = await _waterLogService.getTodayTotal();
+    final todayCount = await _waterLogService.getTodayCount();
+    await _waterLogService.pruneOld();
     if (!mounted) {
       return;
     }
     setState(() {
       _settings = loadedSettings;
       _dailyGoalMl = loadedSettings.dailyGoalMl;
+      _todayTotalMl = todayTotal;
+      _todayCount = todayCount;
+      _canUndo = _todayCount > 0;
       _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
     });
+    debugPrint('HOME total=$_todayTotalMl goal=$_dailyGoalMl progress=${_computeProgress()} undoCount=$todayCount');
   }
 
-  Future<void> _loadPersisted() async {
-    final prefs = await SharedPreferences.getInstance();
-    final todayPersistedTotalMl = prefs.getInt('totalMl') ?? 0;
-    final persistedDailyGoalMl = prefs.getInt('dailyGoalMl') ?? 1500;
+  Future<void> _refreshTodayState({required bool animate}) async {
+    final total = await _waterLogService.getTodayTotal();
+    final count = await _waterLogService.getTodayCount();
     if (!mounted) {
       return;
     }
+    final goal = _dailyGoalMl;
+    final progress = goal <= 0 ? 0.0 : (total / goal).clamp(0.0, 1.0).toDouble();
     setState(() {
-      _displayTotalMl = todayPersistedTotalMl;
-      _dailyGoalMl = persistedDailyGoalMl;
-      _canUndo = _displayTotalMl > 0;
-      _syncWaterAnimation(animate: false, targetProgress: _computeProgress());
+      _todayTotalMl = total;
+      _todayCount = count;
+      _canUndo = _todayCount > 0;
+      _syncWaterAnimation(animate: animate, targetProgress: progress);
     });
-    debugPrint(
-      'HOME persisted total loaded: $todayPersistedTotalMl '
-      '(UI synced display=$_displayTotalMl goal=$_dailyGoalMl)',
-    );
+    debugPrint('HOME total=$_todayTotalMl goal=$_dailyGoalMl progress=$progress undoCount=$count');
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
@@ -161,13 +169,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (!mounted || changed != true) {
         return;
       }
-      await _loadPersisted();
+      await _refreshTodayState(animate: false);
     });
   }
 
   double _computeProgress() {
     final goal = _dailyGoalMl;
-    return goal <= 0 ? 0.0 : (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
+    return goal <= 0 ? 0.0 : (_todayTotalMl / goal).clamp(0.0, 1.0).toDouble();
   }
 
   double get _animatedWaterLevel => _waterLevelTween.transform(Curves.easeOut.transform(_waterCtrl.value));
@@ -254,24 +262,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     HapticFeedback.selectionClick();
 
     final addMl = _settings.stepMl;
-    await widget.repository.addEvent(addMl);
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) {
-      return;
-    }
-
-    final nextTotal = _displayTotalMl + addMl;
-    final goal = _dailyGoalMl;
-    final progress = goal <= 0 ? 0.0 : (nextTotal / goal).clamp(0.0, 1.0);
-    debugPrint('tap add=$addMl displayTotal=$nextTotal goal=$goal progress=$progress');
-    await prefs.setInt('totalMl', nextTotal);
-    await DailyTotalsService.addToToday(addMl);
-
-    setState(() {
-      _displayTotalMl = nextTotal;
-      _canUndo = _displayTotalMl > 0;
-      _syncWaterAnimation(animate: true, targetProgress: progress.toDouble());
-    });
+    await _waterLogService.add(addMl);
+    await _refreshTodayState(animate: true);
 
     _rippleCtrl.forward(from: 0);
     _shakeCtrl.forward(from: 0);
@@ -282,28 +274,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    final latest = await widget.repository.fetchLatestEventToday();
-    if (latest?.id == null) {
-      return;
-    }
-
-    await widget.repository.deleteEventById(latest!.id!);
-    final nextTotal = math.max(_displayTotalMl - latest.amountMl, 0);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('totalMl', nextTotal);
-    await DailyTotalsService.setToday(nextTotal);
-    if (!mounted) {
+    final undone = await _waterLogService.undoLast();
+    if (!undone) {
       return;
     }
 
     HapticFeedback.selectionClick();
-
-    setState(() {
-      _displayTotalMl = nextTotal;
-      _canUndo = _displayTotalMl > 0;
-      _syncWaterAnimation(animate: true, targetProgress: _computeProgress());
-    });
-
+    await _refreshTodayState(animate: true);
     _rippleCtrl.value = 0;
   }
 
@@ -314,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!mounted || saved != true) {
       return;
     }
-    await _loadPersisted();
+    await _refreshTodayState(animate: false);
   }
 
   Future<void> _openHistory() async {
@@ -341,26 +318,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     await widget.repository.deleteTodayEvents();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('totalMl', 0);
     await DailyTotalsService.setToday(0);
     HapticFeedback.mediumImpact();
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _displayTotalMl = 0;
-      _canUndo = false;
-      _syncWaterAnimation(animate: true, targetProgress: 0.0);
-    });
+    await _refreshTodayState(animate: true);
   }
 
   @override
   Widget build(BuildContext context) {
     final goal = _dailyGoalMl;
-    final double progress = goal <= 0 ? 0.0 : (_displayTotalMl / goal).clamp(0.0, 1.0).toDouble();
-    debugPrint('HOME build: displayTotal=$_displayTotalMl goal=$goal progress=$progress');
+    final double progress = goal <= 0 ? 0.0 : (_todayTotalMl / goal).clamp(0.0, 1.0).toDouble();
+    debugPrint('HOME total=$_todayTotalMl goal=$goal progress=$progress undoCount=$_todayCount');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
