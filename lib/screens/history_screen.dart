@@ -96,13 +96,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final days = _buildLastSevenDays();
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('History')),
       body: RefreshIndicator(
         onRefresh: _reload,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            WeeklyBarMini(dailyTotals: _weeklyTotals, goalMl: _goalMl),
+            WeeklyProgressRow(dailyTotals: _weeklyTotals, goalMl: _goalMl),
             const SizedBox(height: 16),
             MonthCalendar(
               dailyTotals: _monthTotals,
@@ -113,7 +114,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               onDaySelected: _selectDay,
             ),
             const SizedBox(height: 16),
-            Text('直近7日', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '直近7日',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.text),
+            ),
             const SizedBox(height: 8),
             if (_loading)
               const Padding(
@@ -126,11 +130,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 final ratio = _goalMl <= 0 ? 0.0 : (total / _goalMl);
                 final percent = (ratio * 100).round();
                 return Card(
+                  color: AppColors.surface,
                   elevation: 0,
                   margin: const EdgeInsets.only(bottom: 8),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
+                    side: const BorderSide(color: AppColors.border),
                   ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
