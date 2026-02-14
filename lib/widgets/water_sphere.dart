@@ -105,23 +105,25 @@ class _WaterSpherePainter extends CustomPainter {
     _drawRefractionBand(canvas, sphereRect, radius, 0.42, 0.72, 0.08);
     _drawRefractionBand(canvas, sphereRect, radius, 0.2, 0.44, 0.09);
 
-    final topHighlightRect = Rect.fromCenter(
-      center: Offset(center.dx - radius * 0.2, center.dy - radius * 0.44),
-      width: radius * 1.1,
-      height: radius * 0.44,
-    );
-    final topHighlight = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+    final rimHighlightRect = sphereRect.deflate(radius * 0.045);
+    final rimHighlight = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = radius * 0.085
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.4)
+      ..shader = SweepGradient(
+        startAngle: -math.pi,
+        endAngle: 0,
         colors: [
-          Colors.white.withValues(alpha: 0.82),
-          const Color(0xFFECFBFF).withValues(alpha: 0.45),
+          Colors.transparent,
+          Colors.white.withValues(alpha: 0.1),
+          const Color(0xFFE3F7FF).withValues(alpha: 0.16),
+          Colors.white.withValues(alpha: 0.08),
           Colors.transparent,
         ],
-        stops: const [0, 0.45, 1],
-      ).createShader(topHighlightRect);
-    canvas.drawOval(topHighlightRect, topHighlight);
+        stops: const [0.0, 0.2, 0.52, 0.82, 1.0],
+      ).createShader(rimHighlightRect);
+    canvas.drawArc(rimHighlightRect, -math.pi, math.pi, false, rimHighlight);
 
     final softShadow = Paint()
       ..color = Colors.black.withValues(alpha: 0.08)
