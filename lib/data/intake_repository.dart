@@ -73,6 +73,16 @@ class IntakeRepository {
     return (rows.first['total'] as int?) ?? 0;
   }
 
+  Future<int> countTodayEvents() async {
+    final db = await _dbHelper.database;
+    final range = _dayRange(DateTime.now());
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) count FROM intake_events WHERE timestamp >= ? AND timestamp < ?',
+      [range.start, range.end],
+    );
+    return (rows.first['count'] as int?) ?? 0;
+  }
+
   Future<int> deleteTodayEvents() async {
     final db = await _dbHelper.database;
     final range = _dayRange(DateTime.now());
@@ -80,6 +90,20 @@ class IntakeRepository {
       'intake_events',
       where: 'timestamp >= ? AND timestamp < ?',
       whereArgs: [range.start, range.end],
+    );
+  }
+
+  Future<int> deleteEventsBefore(DateTime dateExclusive) async {
+    final db = await _dbHelper.database;
+    final boundary = DateTime(
+      dateExclusive.year,
+      dateExclusive.month,
+      dateExclusive.day,
+    ).millisecondsSinceEpoch;
+    return db.delete(
+      'intake_events',
+      where: 'timestamp < ?',
+      whereArgs: [boundary],
     );
   }
 

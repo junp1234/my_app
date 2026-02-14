@@ -94,4 +94,31 @@ void main() {
     final dbPath = await getDatabasesPath();
     await deleteDatabase('$dbPath/$dbName');
   });
+  test('countTodayEvents and deleteEventsBefore keep recent day records', () async {
+    final dbName = 'count_and_prune_test.db';
+    final helper = DatabaseHelper(databaseName: dbName);
+    final repository = IntakeRepository(dbHelper: helper);
+
+    final now = DateTime.now();
+    final tenDaysAgo = now.subtract(const Duration(days: 10));
+    final fortyDaysAgo = now.subtract(const Duration(days: 40));
+
+    await repository.addEvent(250, at: now.subtract(const Duration(minutes: 5)));
+    await repository.addEvent(300, at: tenDaysAgo);
+    await repository.addEvent(120, at: fortyDaysAgo);
+
+    expect(await repository.countTodayEvents(), 1);
+
+    final deleted = await repository.deleteEventsBefore(now.subtract(const Duration(days: 30)));
+
+    expect(deleted, 1);
+    expect(await repository.getTotalForDay(tenDaysAgo), 300);
+    expect(await repository.sumTodayMl(), 250);
+
+    final db = await helper.database;
+    await db.close();
+    final dbPath = await getDatabasesPath();
+    await deleteDatabase('$dbPath/$dbName');
+  });
+
 }
