@@ -45,6 +45,8 @@ class DropletButton extends StatelessWidget {
 class _DropletPainter extends CustomPainter {
   const _DropletPainter({required this.isPressed});
 
+  static bool _hasLoggedPathUpdate = false;
+
   final bool isPressed;
 
   @override
@@ -52,12 +54,15 @@ class _DropletPainter extends CustomPainter {
     final dropletPath = _buildDropletPath(size);
     final highlightStrength = isPressed ? 0.82 : 1.0;
 
-    canvas.drawShadow(
-      dropletPath.shift(const Offset(0, 2.2)),
-      const Color(0xFF3D7AA9).withValues(alpha: isPressed ? 0.10 : 0.14),
-      isPressed ? 7 : 9,
-      false,
+    final shadowRect = Rect.fromCenter(
+      center: Offset(size.width * 0.5, size.height * 0.95),
+      width: size.width * 0.52,
+      height: size.height * 0.12,
     );
+    final shadowPaint = Paint()
+      ..color = const Color(0xFF1B4D73).withValues(alpha: isPressed ? 0.10 : 0.13)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 13);
+    canvas.drawOval(shadowRect, shadowPaint);
 
     canvas.save();
     canvas.clipPath(dropletPath);
@@ -99,8 +104,8 @@ class _DropletPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.30 * highlightStrength),
-          const Color(0xFFE8F8FF).withValues(alpha: 0.15 * highlightStrength),
+          Colors.white.withValues(alpha: 0.22 * highlightStrength),
+          const Color(0xFFE8F8FF).withValues(alpha: 0.16 * highlightStrength),
           Colors.transparent,
         ],
         stops: const [0.0, 0.65, 1.0],
@@ -114,8 +119,8 @@ class _DropletPainter extends CustomPainter {
       ..addOval(
         Rect.fromCenter(
           center: Offset(size.width * 0.67, size.height * 0.76),
-          width: size.width * 0.18,
-          height: size.width * 0.18,
+          width: size.width * 0.14,
+          height: size.width * 0.14,
         ),
       );
     final subHighlightPaint = Paint()
@@ -123,8 +128,8 @@ class _DropletPainter extends CustomPainter {
         center: const Alignment(-0.1, -0.1),
         radius: 0.8,
         colors: [
-          Colors.white.withValues(alpha: 0.18 * highlightStrength),
-          const Color(0xFFD8F3FF).withValues(alpha: 0.09 * highlightStrength),
+          Colors.white.withValues(alpha: 0.20 * highlightStrength),
+          const Color(0xFFD8F3FF).withValues(alpha: 0.11 * highlightStrength),
           Colors.transparent,
         ],
         stops: const [0.0, 0.72, 1.0],
@@ -148,26 +153,31 @@ class _DropletPainter extends CustomPainter {
   }
 
   Path _buildDropletPath(Size size) {
+    if (!_hasLoggedPathUpdate) {
+      _hasLoggedPathUpdate = true;
+      debugPrint('DROPLET: path updated');
+    }
+
     final centerX = size.width * 0.5;
-    final bottomY = size.height * 0.94;
-    final bottomRadius = Radius.elliptical(size.width * 0.20, size.height * 0.10);
+    final bottomY = size.height * 0.91;
+    final bottomRadius = Radius.elliptical(size.width * 0.23, size.height * 0.12);
 
     return Path()
       ..moveTo(centerX, size.height * 0.07)
       ..cubicTo(
-        size.width * 0.38,
+        size.width * 0.35,
         size.height * 0.10,
-        size.width * 0.20,
-        size.height * 0.30,
-        size.width * 0.21,
-        size.height * 0.54,
+        size.width * 0.16,
+        size.height * 0.31,
+        size.width * 0.19,
+        size.height * 0.56,
       )
       ..cubicTo(
-        size.width * 0.22,
-        size.height * 0.76,
-        size.width * 0.32,
+        size.width * 0.23,
+        size.height * 0.78,
+        size.width * 0.33,
         size.height * 0.90,
-        size.width * 0.44,
+        size.width * 0.43,
         bottomY,
       )
       ..arcToPoint(
@@ -176,17 +186,17 @@ class _DropletPainter extends CustomPainter {
         clockwise: false,
       )
       ..cubicTo(
-        size.width * 0.68,
+        size.width * 0.67,
         size.height * 0.90,
-        size.width * 0.78,
-        size.height * 0.76,
-        size.width * 0.79,
-        size.height * 0.54,
+        size.width * 0.77,
+        size.height * 0.78,
+        size.width * 0.81,
+        size.height * 0.56,
       )
       ..cubicTo(
-        size.width * 0.80,
-        size.height * 0.30,
-        size.width * 0.62,
+        size.width * 0.84,
+        size.height * 0.31,
+        size.width * 0.65,
         size.height * 0.10,
         centerX,
         size.height * 0.07,
