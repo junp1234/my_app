@@ -53,10 +53,10 @@ class _DropletPainter extends CustomPainter {
     final highlightStrength = isPressed ? 0.82 : 1.0;
 
     canvas.drawShadow(
-      dropletPath,
-      const Color(0xFF4B81AA).withValues(alpha: isPressed ? 0.12 : 0.18),
-      isPressed ? 8 : 10,
-      true,
+      dropletPath.shift(const Offset(0, 2.2)),
+      const Color(0xFF3D7AA9).withValues(alpha: isPressed ? 0.10 : 0.14),
+      isPressed ? 7 : 9,
+      false,
     );
 
     canvas.save();
@@ -77,63 +77,45 @@ class _DropletPainter extends CustomPainter {
 
     final depthPaint = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(-0.34, -0.42),
+        center: const Alignment(-0.30, -0.40),
         radius: 1.02,
         colors: [
-          Colors.white.withValues(alpha: 0.16 * highlightStrength),
-          const Color(0xFF3A9CD9).withValues(alpha: 0.12),
-          const Color(0xFF1E76B5).withValues(alpha: 0.16),
+          Colors.white.withValues(alpha: 0.14 * highlightStrength),
+          const Color(0xFF3A9CD9).withValues(alpha: 0.10),
+          const Color(0xFF1E76B5).withValues(alpha: 0.15),
         ],
         stops: const [0.0, 0.64, 1.0],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, depthPaint);
 
-    final mainHighlightPath = Path()
-      ..moveTo(size.width * 0.40, size.height * 0.14)
-      ..cubicTo(
-        size.width * 0.28,
-        size.height * 0.27,
-        size.width * 0.23,
-        size.height * 0.50,
-        size.width * 0.31,
-        size.height * 0.67,
-      )
-      ..cubicTo(
-        size.width * 0.36,
-        size.height * 0.73,
-        size.width * 0.44,
-        size.height * 0.72,
-        size.width * 0.49,
-        size.height * 0.64,
-      )
-      ..cubicTo(
-        size.width * 0.40,
-        size.height * 0.52,
-        size.width * 0.37,
-        size.height * 0.30,
-        size.width * 0.46,
-        size.height * 0.18,
-      )
-      ..close();
+    final mainHighlightRect = Rect.fromLTWH(
+      size.width * 0.27,
+      size.height * 0.20,
+      size.width * 0.16,
+      size.height * 0.46,
+    );
     final mainHighlightPaint = Paint()
       ..shader = LinearGradient(
-        begin: Alignment.topLeft,
+        begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Colors.white.withValues(alpha: 0.25 * highlightStrength),
-          const Color(0xFFDBF4FF).withValues(alpha: 0.18 * highlightStrength),
+          Colors.white.withValues(alpha: 0.30 * highlightStrength),
+          const Color(0xFFE8F8FF).withValues(alpha: 0.15 * highlightStrength),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.58, 1.0],
-      ).createShader(mainHighlightPath.getBounds());
-    canvas.drawPath(mainHighlightPath, mainHighlightPaint);
+        stops: const [0.0, 0.65, 1.0],
+      ).createShader(mainHighlightRect);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(mainHighlightRect, Radius.circular(size.width * 0.10)),
+      mainHighlightPaint,
+    );
 
     final subHighlightPath = Path()
       ..addOval(
         Rect.fromCenter(
-          center: Offset(size.width * 0.66, size.height * 0.77),
-          width: size.width * 0.22,
-          height: size.height * 0.12,
+          center: Offset(size.width * 0.67, size.height * 0.76),
+          width: size.width * 0.18,
+          height: size.width * 0.18,
         ),
       );
     final subHighlightPaint = Paint()
@@ -141,8 +123,8 @@ class _DropletPainter extends CustomPainter {
         center: const Alignment(-0.1, -0.1),
         radius: 0.8,
         colors: [
-          Colors.white.withValues(alpha: 0.16 * highlightStrength),
-          const Color(0xFFD8F3FF).withValues(alpha: 0.10 * highlightStrength),
+          Colors.white.withValues(alpha: 0.18 * highlightStrength),
+          const Color(0xFFD8F3FF).withValues(alpha: 0.09 * highlightStrength),
           Colors.transparent,
         ],
         stops: const [0.0, 0.72, 1.0],
@@ -167,47 +149,47 @@ class _DropletPainter extends CustomPainter {
 
   Path _buildDropletPath(Size size) {
     final centerX = size.width * 0.5;
-    final bottomY = size.height * 0.95;
-    final bottomRadius = Radius.elliptical(size.width * 0.13, size.height * 0.09);
+    final bottomY = size.height * 0.94;
+    final bottomRadius = Radius.elliptical(size.width * 0.20, size.height * 0.10);
 
     return Path()
-      ..moveTo(centerX, size.height * 0.06)
+      ..moveTo(centerX, size.height * 0.07)
       ..cubicTo(
-        size.width * 0.39,
+        size.width * 0.38,
         size.height * 0.10,
-        size.width * 0.22,
-        size.height * 0.30,
         size.width * 0.20,
-        size.height * 0.52,
+        size.height * 0.30,
+        size.width * 0.21,
+        size.height * 0.54,
       )
       ..cubicTo(
-        size.width * 0.18,
-        size.height * 0.77,
-        size.width * 0.31,
-        size.height * 0.93,
-        size.width * 0.43,
+        size.width * 0.22,
+        size.height * 0.76,
+        size.width * 0.32,
+        size.height * 0.90,
+        size.width * 0.44,
         bottomY,
       )
       ..arcToPoint(
-        Offset(size.width * 0.57, bottomY),
+        Offset(size.width * 0.56, bottomY),
         radius: bottomRadius,
         clockwise: false,
       )
       ..cubicTo(
-        size.width * 0.69,
-        size.height * 0.93,
-        size.width * 0.82,
-        size.height * 0.77,
-        size.width * 0.80,
-        size.height * 0.52,
+        size.width * 0.68,
+        size.height * 0.90,
+        size.width * 0.78,
+        size.height * 0.76,
+        size.width * 0.79,
+        size.height * 0.54,
       )
       ..cubicTo(
-        size.width * 0.78,
+        size.width * 0.80,
         size.height * 0.30,
-        size.width * 0.61,
+        size.width * 0.62,
         size.height * 0.10,
         centerX,
-        size.height * 0.06,
+        size.height * 0.07,
       )
       ..close();
   }

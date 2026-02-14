@@ -7,7 +7,7 @@ import '../data/intake_repository.dart';
 import '../models/app_settings.dart';
 import '../services/settings_repository.dart';
 import '../widgets/droplet_button.dart';
-import '../widgets/full_overlay.dart';
+import '../widgets/completed_overlay.dart';
 import '../widgets/glass_gauge.dart';
 import '../services/daily_totals_service.dart';
 import '../services/water_log_service.dart';
@@ -51,6 +51,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
   bool _hasCelebratedFull = false;
+  bool _showCompletedOverlay = false;
+  bool _completedOverlayShownToday = false;
+  String _overlayDateKey = '';
   final GlobalKey _glassKey = GlobalKey();
 
   @override
@@ -70,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..stop();
     _maybeShowProfileOnFirstRun();
+    unawaited(_prepareCompletedOverlayState());
     _waterLogService = WaterLogService(widget.repository);
     debugPrint('HOME init: total=$_todayTotalMl goal=$_dailyGoalMl');
     unawaited(_initializeHomeState());
@@ -116,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _refreshTodayState({required bool animate}) async {
+    final previousTotal = _todayTotalMl;
     final total = await _waterLogService.getTodayTotal();
     final count = await _waterLogService.getTodayCount();
     if (!mounted) {
@@ -129,7 +134,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _canUndo = _todayCount > 0;
       _syncWaterAnimation(animate: animate, targetProgress: progress);
     });
+    _evaluateCompletedOverlay(previousTotal, total);
     debugPrint('HOME total=$_todayTotalMl goal=$_dailyGoalMl progress=$progress undoCount=$count');
+  }
+
+
+  String _todayOverlayKey() {
+    final now = DateTime.now();
+    final yyyy = now.year.toString().padLeft(4, '0');
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    return 'completedShown_${yyyy}${mm}${dd}';
+  }
+
+  Future<void> _prepareCompletedOverlayState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _todayOverlayKey();
+    final shown = prefs.getBool(key) ?? false;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _overlayDateKey = key;
+      _completedOverlayShownToday = shown;
+      if (shown) {
+        _showCompletedOverlay = false;
+      }
+    });
+  }
+
+  Future<void> _markCompletedOverlayDismissed() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = _overlayDateKey.isEmpty ? _todayOverlayKey() : _overlayDateKey;
+    await prefs.setBool(key, true);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _completedOverlayShownToday = true;
+      _showCompletedOverlay = false;
+    });
+  }
+
+  void _evaluateCompletedOverlay(int previousTotal, int newTotal) {
+    final reachedNow = previousTotal < _dailyGoalMl && newTotal >= _dailyGoalMl;
+    if (!reachedNow || _completedOverlayShownToday) {
+      return;
+    }
+    setState(() {
+      _showCompletedOverlay = true;
+    });
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
@@ -260,7 +314,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final goal = _dailyGoalMl;
     final double progress = goal <= 0 ? 0.0 : (_todayTotalMl / goal).clamp(0.0, 1.0).toDouble();
-    final bool isFull = goal > 0 && _todayTotalMl >= goal;
     debugPrint('HOME total=$_todayTotalMl goal=$goal progress=$progress undoCount=$_todayCount');
 
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
@@ -376,8 +429,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          if (isFull)
-            const FullOverlay(),
+          if (_showCompletedOverlay)
+            CompletedOverlay(onClose: _markCompletedOverlayDismissed),
         ],
       ),
     );
