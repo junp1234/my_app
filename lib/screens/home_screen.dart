@@ -13,6 +13,7 @@ import '../services/water_log_service.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/falling_droplet.dart';
 import '../widgets/glass_gauge.dart';
+import '../widgets/painters/water_fill_painter.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -35,6 +36,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _settingsRepo = SettingsRepository.instance;
+  final GlobalKey _overlayKey = GlobalKey();
+  final GlobalKey _addButtonKey = GlobalKey();
 
   late AppSettings _settings;
   int _todayTotalMl = 0;
@@ -56,6 +59,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
 
   Tween<double> _waterLevelTween = Tween<double>(begin: 0, end: 0);
+  Offset? _dropStart;
+  Offset? _dropEnd;
+  Offset? _rippleCenter;
 
   @override
   void initState() {
@@ -151,15 +157,61 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _waterCtrl
       ..reset()
       ..forward();
+
+    final metrics = _buildGlassMetrics(1.0);
+    if (metrics != null) {
+      _rippleCenter = Offset(metrics.innerRect.center.dx, metrics.waterTopY + 4);
+    }
     _rippleCtrl.forward(from: 0);
   }
 
-  void _triggerRipple() {
-    debugPrint('SPLASH -> start ripple');
+  void _triggerRipple(Offset center) {
+    _rippleCenter = center;
     _rippleCtrl
       ..stop()
       ..reset()
       ..forward();
+  }
+
+  Offset _getAddButtonBottomCenter() {
+    final btnCtx = _addButtonKey.currentContext;
+    final stackCtx = _overlayKey.currentContext;
+    if (btnCtx == null || stackCtx == null) {
+      return const Offset(0, 0);
+    }
+
+    final btnBox = btnCtx.findRenderObject() as RenderBox;
+    final btnTopLeftGlobal = btnBox.localToGlobal(Offset.zero);
+    final btnBottomCenterGlobal = btnTopLeftGlobal + Offset(btnBox.size.width / 2, btnBox.size.height);
+
+    final stackBox = stackCtx.findRenderObject() as RenderBox;
+    final stackTopLeftGlobal = stackBox.localToGlobal(Offset.zero);
+
+    return btnBottomCenterGlobal - stackTopLeftGlobal;
+  }
+
+  _GlassWaterMetrics? _buildGlassMetrics(double progress) {
+    final stackCtx = _overlayKey.currentContext;
+    if (stackCtx == null) {
+      return null;
+    }
+    final stackBox = stackCtx.findRenderObject() as RenderBox;
+    final stackSize = stackBox.size;
+    const glassSize = 272.0;
+    final glassRect = Rect.fromLTWH(
+      (stackSize.width - glassSize) / 2,
+      (stackSize.height - glassSize) / 2,
+      glassSize,
+      glassSize,
+    );
+
+    final center = glassRect.center;
+    final bowlRadius = glassSize * 0.39;
+    final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
+    final innerRect = outerRect.deflate(11);
+    final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
+    final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
+    return _GlassWaterMetrics(innerRect: innerRect, waterTopY: waterTopY, waterPath: waterPath);
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
@@ -222,14 +274,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     HapticFeedback.selectionClick();
+    final metrics = _buildGlassMetrics(nextProgress);
+    final start = _getAddButtonBottomCenter();
+    final end = metrics == null ? const Offset(0, 0) : Offset(metrics.innerRect.center.dx, metrics.waterTopY + 4);
+
     setState(() {
       _todayTotalMl = nextTotal;
       _todayCount = nextCount;
       _dropSeq += 1;
       _canUndo = _intakeHistory.isNotEmpty;
+      _dropStart = start;
+      _dropEnd = end;
       _syncWaterAnimation(animate: true, targetProgress: nextProgress);
     });
 
+    debugPrint('DROP start=$start end=$end');
     debugPrint('ADD pressed -> start drop seq=$_dropSeq total=$nextTotal goal=$goal');
 
     _dropCtrl
@@ -323,6 +382,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           SafeArea(
             child: Stack(
+              key: _overlayKey,
               children: [
                 Positioned(
                   top: 8,
@@ -353,24 +413,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             rippleT: _rippleCtrl.value,
                             dropT: 0,
                           ),
-                          FallingDroplet(
-                            controller: _dropCtrl,
-                            onSplash: _triggerRipple,
-                          ),
-                          RippleScreenOverlay(
-                            size: 272,
-                            progress: _animatedWaterLevel,
-                            burstT: _rippleCtrl.value,
-                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
+                if (_dropStart != null && _dropEnd != null)
+                  FallingDroplet(
+                    controller: _dropCtrl,
+                    start: _dropStart!,
+                    end: _dropEnd!,
+                    onSplash: _triggerRipple,
+                  ),
+                Builder(
+                  builder: (_) {
+                    final metrics = _buildGlassMetrics(_animatedWaterLevel);
+                    final rippleCenter = _rippleCenter;
+                    if (metrics == null || rippleCenter == null || _animatedWaterLevel <= 0) {
+                      return const SizedBox.shrink();
+                    }
+                    final waterBounds = Rect.fromLTRB(
+                      metrics.innerRect.left,
+                      metrics.waterTopY,
+                      metrics.innerRect.right,
+                      metrics.innerRect.bottom,
+                    );
+
+                    return RippleScreenOverlay(
+                      burstT: _rippleCtrl.value,
+                      waterPath: metrics.waterPath,
+                      waterTopY: metrics.waterTopY,
+                      waterBounds: waterBounds,
+                      center: rippleCenter,
+                    );
+                  },
+                ),
                 Positioned.fill(
                   child: Align(
                     alignment: const Alignment(0, -0.73),
                     child: DropletButton(
+                      key: _addButtonKey,
                       scale: pressScale * holdScale,
                       isPressed: _pressCtrl.isAnimating || _isHolding,
                       onTap: _addWater,
@@ -427,4 +509,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+}
+
+class _GlassWaterMetrics {
+  const _GlassWaterMetrics({
+    required this.innerRect,
+    required this.waterTopY,
+    required this.waterPath,
+  });
+
+  final Rect innerRect;
+  final double waterTopY;
+  final Path waterPath;
 }

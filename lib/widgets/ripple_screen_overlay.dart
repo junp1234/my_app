@@ -3,33 +3,37 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import 'painters/water_fill_painter.dart';
-
 class RippleScreenOverlay extends StatelessWidget {
   const RippleScreenOverlay({
     super.key,
-    required this.size,
-    required this.progress,
     required this.burstT,
+    required this.waterPath,
+    required this.waterTopY,
+    required this.waterBounds,
+    required this.center,
   });
 
-  final double size;
-  final double progress;
   final double burstT;
+  final Path waterPath;
+  final double waterTopY;
+  final Rect waterBounds;
+  final Offset center;
 
   @override
   Widget build(BuildContext context) {
-    if (burstT <= 0 || progress <= 0) {
+    if (burstT <= 0) {
       return const SizedBox.shrink();
     }
 
     return IgnorePointer(
-      child: SizedBox.square(
-        dimension: size,
+      child: SizedBox.expand(
         child: CustomPaint(
           painter: _RippleScreenPainter(
-            progress: progress,
             burstT: burstT,
+            waterPath: waterPath,
+            waterTopY: waterTopY,
+            waterBounds: waterBounds,
+            center: center,
           ),
         ),
       ),
@@ -39,33 +43,36 @@ class RippleScreenOverlay extends StatelessWidget {
 
 class _RippleScreenPainter extends CustomPainter {
   const _RippleScreenPainter({
-    required this.progress,
     required this.burstT,
+    required this.waterPath,
+    required this.waterTopY,
+    required this.waterBounds,
+    required this.center,
   });
 
-  final double progress;
   final double burstT;
+  final Path waterPath;
+  final double waterTopY;
+  final Rect waterBounds;
+  final Offset center;
 
   @override
   void paint(Canvas canvas, Size size) {
-    debugPrint('RIPPLE paint value=$burstT');
-    final center = size.center(Offset.zero);
-    final bowlRadius = size.width * 0.39;
-    final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
-    final innerRect = outerRect.deflate(11);
-    final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
-    final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
-    final rippleCenter = Offset(center.dx, waterTopY + 6);
+    final margin = 8.0;
+    final topLimit = center.dy - (waterTopY - 2);
+    final bottomLimit = waterBounds.bottom - center.dy;
+    final sideLimit = math.min(center.dx - waterBounds.left, waterBounds.right - center.dx);
+    final rippleMaxRadius = math.max(0.0, math.min(sideLimit, math.min(topLimit, bottomLimit)) - margin);
+    debugPrint('RIPPLE center=$center maxR=$rippleMaxRadius');
 
     canvas.save();
     canvas.clipPath(waterPath);
 
-    final maxR = innerRect.width * 0.44;
-    _drawRing(canvas, center: rippleCenter, maxR: maxR, progress: burstT, alphaMultiplier: 1.0);
+    _drawRing(canvas, center: center, maxR: rippleMaxRadius, progress: burstT, alphaMultiplier: 1.0);
 
     const delay = 0.18;
     final t2 = ((burstT - delay) / (1 - delay)).clamp(0.0, 1.0);
-    _drawRing(canvas, center: rippleCenter, maxR: maxR, progress: t2, alphaMultiplier: 0.75);
+    _drawRing(canvas, center: center, maxR: rippleMaxRadius, progress: t2, alphaMultiplier: 0.75);
 
     canvas.restore();
   }
@@ -84,8 +91,8 @@ class _RippleScreenPainter extends CustomPainter {
     final eased = Curves.easeOut.transform(progress);
     final radius = lerpDouble(0, maxR, eased)!;
     final pulse = math.sin(math.pi * progress).clamp(0.0, 1.0);
-    final alpha = (pulse * 0.5 * alphaMultiplier).clamp(0.0, 1.0);
-    final strokeWidth = lerpDouble(2.2, 3.4, pulse)!;
+    final alpha = (pulse * 0.58 * alphaMultiplier).clamp(0.0, 1.0);
+    final strokeWidth = lerpDouble(1.8, 2.5, pulse)!;
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
@@ -97,6 +104,10 @@ class _RippleScreenPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RippleScreenPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.burstT != burstT;
+    return oldDelegate.burstT != burstT ||
+        oldDelegate.waterTopY != waterTopY ||
+        oldDelegate.waterBounds != waterBounds ||
+        oldDelegate.center != center ||
+        oldDelegate.waterPath != waterPath;
   }
 }
