@@ -86,6 +86,21 @@ class DailyTotalsService {
     return result;
   }
 
+  static Future<Map<DateTime, int>> getMonthTotals(int year, int month) async {
+    final map = await loadMap();
+    final result = <DateTime, int>{};
+
+    map.forEach((key, value) {
+      final date = _parseDate(key);
+      if (date == null || date.year != year || date.month != month) {
+        return;
+      }
+      result[DateTime(date.year, date.month, date.day)] = value;
+    });
+
+    return result;
+  }
+
   static Future<void> _saveWithPrune(Map<String, int> map) async {
     final now = DateTime.now();
     final threshold = DateTime(now.year, now.month, now.day - 30);
