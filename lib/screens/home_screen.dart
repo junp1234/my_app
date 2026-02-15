@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isHolding = false;
 
   late final AnimationController _pressCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 120));
-  late final AnimationController _dropCtl = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+  late final AnimationController _dropCtl = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
   late final AnimationController _waterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
 

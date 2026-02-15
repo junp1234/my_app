@@ -26,19 +26,20 @@ class DropShotOverlay extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        final t = Curves.easeIn.transform(controller.value);
+        final t = Curves.easeInOutCubic.transform(controller.value);
         final position = Offset.lerp(begin, finish, t);
         if (position == null) {
           return const SizedBox.shrink();
         }
 
         const dropletSize = 12.0;
+        const dropletHeightMultiplier = 1.30;
         return Stack(
           clipBehavior: Clip.none,
           children: [
             Positioned(
               left: position.dx - (dropletSize / 2),
-              top: position.dy - ((dropletSize * 1.25) / 2),
+              top: position.dy - ((dropletSize * dropletHeightMultiplier) / 2),
               child: const _DropTear(size: dropletSize),
             ),
           ],
@@ -57,7 +58,7 @@ class _DropTear extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: size,
-      height: size * 1.25,
+      height: size * 1.30,
       child: CustomPaint(
         painter: _DropTearPainter(size: size),
       ),
@@ -73,27 +74,29 @@ class _DropTearPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size canvasSize) {
     final w = size;
-    final h = size * 1.25;
+    final h = size * 1.30;
     final cx = canvasSize.width / 2;
     final cy = canvasSize.height / 2;
+    final top = Offset(cx, cy - h * 0.58);
+    final bottom = Offset(cx, cy + h * 0.52);
 
     final path = Path()
-      ..moveTo(cx, cy - h * 0.55)
+      ..moveTo(top.dx, top.dy)
       ..cubicTo(
-        cx + w * 0.45,
-        cy - h * 0.35,
         cx + w * 0.55,
+        cy - h * 0.40,
+        cx + w * 0.62,
         cy + h * 0.10,
-        cx,
-        cy + h * 0.55,
+        bottom.dx,
+        bottom.dy,
       )
       ..cubicTo(
-        cx - w * 0.55,
+        cx - w * 0.62,
         cy + h * 0.10,
-        cx - w * 0.45,
-        cy - h * 0.35,
-        cx,
-        cy - h * 0.55,
+        cx - w * 0.55,
+        cy - h * 0.40,
+        top.dx,
+        top.dy,
       )
       ..close();
 
@@ -105,14 +108,14 @@ class _DropTearPainter extends CustomPainter {
     canvas.drawPath(path, fillPaint);
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.28)
+      ..color = Colors.white.withValues(alpha: 0.22)
       ..style = PaintingStyle.fill;
     canvas.drawOval(
       Rect.fromLTWH(
-        cx - w * 0.28,
-        cy - h * 0.35,
-        w * 0.24,
-        h * 0.42,
+        cx - w * 0.26,
+        cy - h * 0.34,
+        w * 0.20,
+        h * 0.36,
       ),
       highlightPaint,
     );
