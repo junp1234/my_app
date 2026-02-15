@@ -3,7 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import 'glass_water_palette.dart';
+import '../../theme/water_theme.dart';
 
 class WaterFillPainter extends CustomPainter {
   const WaterFillPainter({
@@ -87,17 +87,17 @@ class WaterFillPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          GlassWaterPalette.top,
-          GlassWaterPalette.mid,
-          GlassWaterPalette.midDeep,
-          GlassWaterPalette.bottom,
+          WaterTheme.waterTopColor,
+          WaterTheme.waterMidColor,
+          WaterTheme.waterDeepColor,
+          WaterTheme.waterBottomColor,
         ],
         stops: const [0.0, 0.45, 0.76, 1.0],
       ).createShader(waterRect);
     canvas.drawPath(waterPath, fillPaint);
 
     final globalWaterTint = Paint()
-      ..color = GlassWaterPalette.base.withValues(alpha: 0.10);
+      ..color = WaterTheme.primaryWater.withValues(alpha: 0.10);
     canvas.drawPath(waterPath, globalWaterTint);
 
     final depthShadowPaint = Paint()

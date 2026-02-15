@@ -93,35 +93,39 @@ class _FallingDropletPainter extends CustomPainter {
     final cx = current.dx;
     final cy = current.dy;
 
+    final topY = cy - h * 0.60;
+    final bottomY = cy + h * 0.46;
+
     final dropPath = Path()
-      ..moveTo(cx, cy - h * 0.55)
+      ..moveTo(cx, topY)
       ..cubicTo(
-        cx + w * 0.45,
-        cy - h * 0.35,
-        cx + w * 0.55,
-        cy + h * 0.10,
+        cx + w * 0.40,
+        cy - h * 0.45,
+        cx + w * 0.78,
+        cy + h * 0.05,
         cx,
-        cy + h * 0.55,
+        bottomY,
       )
       ..cubicTo(
-        cx - w * 0.55,
-        cy + h * 0.10,
-        cx - w * 0.45,
-        cy - h * 0.35,
+        cx - w * 0.78,
+        cy + h * 0.05,
+        cx - w * 0.40,
+        cy - h * 0.45,
         cx,
-        cy - h * 0.55,
+        topY,
       )
       ..close();
 
-    canvas.drawShadow(dropPath, Colors.black.withValues(alpha: 0.12), 3, false);
+    canvas.drawShadow(dropPath, Colors.black.withValues(alpha: 0.08), 2.4, false);
 
+    final dropFill = Color.lerp(WaterTheme.waterTopColor, Colors.white, 0.10) ?? WaterTheme.waterTopColor;
     final fillPaint = Paint()
-      ..color = WaterTheme.deepBlue.withValues(alpha: 0.90)
+      ..color = dropFill.withValues(alpha: 0.74)
       ..style = PaintingStyle.fill;
     canvas.drawPath(dropPath, fillPaint);
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.28)
+      ..color = Colors.white.withValues(alpha: 0.16)
       ..style = PaintingStyle.fill;
     canvas.drawOval(
       Rect.fromLTWH(

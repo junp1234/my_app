@@ -33,7 +33,7 @@ class DropShotOverlay extends StatelessWidget {
         }
 
         const dropletSize = 12.0;
-        const dropletHeightMultiplier = 1.30;
+        const dropletHeightMultiplier = 1.25;
         return Stack(
           clipBehavior: Clip.none,
           children: [
@@ -58,7 +58,7 @@ class _DropTear extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: size,
-      height: size * 1.30,
+      height: size * 1.25,
       child: CustomPaint(
         painter: _DropTearPainter(size: size),
       ),
@@ -74,41 +74,43 @@ class _DropTearPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size canvasSize) {
     final w = size;
-    final h = size * 1.30;
+    final h = size * 1.25;
     final cx = canvasSize.width / 2;
     final cy = canvasSize.height / 2;
-    final top = Offset(cx, cy - h * 0.58);
-    final bottom = Offset(cx, cy + h * 0.52);
+
+    final topY = cy - h * 0.60;
+    final bottomY = cy + h * 0.46;
 
     final path = Path()
-      ..moveTo(top.dx, top.dy)
+      ..moveTo(cx, topY)
       ..cubicTo(
-        cx + w * 0.55,
-        cy - h * 0.40,
-        cx + w * 0.62,
-        cy + h * 0.10,
-        bottom.dx,
-        bottom.dy,
+        cx + w * 0.40,
+        cy - h * 0.45,
+        cx + w * 0.78,
+        cy + h * 0.05,
+        cx,
+        bottomY,
       )
       ..cubicTo(
-        cx - w * 0.62,
-        cy + h * 0.10,
-        cx - w * 0.55,
-        cy - h * 0.40,
-        top.dx,
-        top.dy,
+        cx - w * 0.78,
+        cy + h * 0.05,
+        cx - w * 0.40,
+        cy - h * 0.45,
+        cx,
+        topY,
       )
       ..close();
 
-    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.12), 3, false);
+    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.08), 2.4, false);
 
+    final dropFill = Color.lerp(WaterTheme.waterTopColor, Colors.white, 0.10) ?? WaterTheme.waterTopColor;
     final fillPaint = Paint()
-      ..color = WaterTheme.deepBlue.withValues(alpha: 0.90)
+      ..color = dropFill.withValues(alpha: 0.74)
       ..style = PaintingStyle.fill;
     canvas.drawPath(path, fillPaint);
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.22)
+      ..color = Colors.white.withValues(alpha: 0.16)
       ..style = PaintingStyle.fill;
     canvas.drawOval(
       Rect.fromLTWH(
