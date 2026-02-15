@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'painters/glass_bowl_painter.dart';
 import 'painters/ripple_painter.dart';
 import 'painters/water_fill_painter.dart';
-import 'shapes/teardrop_path.dart';
 
 class GlassGauge extends StatelessWidget {
   const GlassGauge({
@@ -21,43 +19,56 @@ class GlassGauge extends StatelessWidget {
   final bool extraRippleLayer;
   final double size;
 
+  static const double bowlRadiusFactor = 0.39;
+  static const double innerDeflate = 11;
+
+  static Rect outerRectForSize(Size size) {
+    final center = size.center(Offset.zero);
+    return Rect.fromCircle(center: center, radius: size.width * bowlRadiusFactor);
+  }
+
+  static Rect innerRectForSize(Size size) {
+    return outerRectForSize(size).deflate(innerDeflate);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final gaugeSize = Size.square(size);
+
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        size: Size.square(size),
-        painter: _GlassGaugePainter(
-          progress: progress,
-          rippleT: rippleT,
-          dropT: dropT,
-          extraRippleLayer: extraRippleLayer,
-        ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CustomPaint(
+            size: gaugeSize,
+            painter: _GlassWaterPainter(
+              progress: progress,
+            ),
+          ),
+          CustomPaint(
+            size: gaugeSize,
+            painter: _GlassRipplePainter(
+              progress: progress,
+              rippleT: rippleT,
+              extraRippleLayer: extraRippleLayer,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _GlassGaugePainter extends CustomPainter {
-  const _GlassGaugePainter({
-    required this.progress,
-    required this.rippleT,
-    required this.dropT,
-    required this.extraRippleLayer,
-  });
+class _GlassWaterPainter extends CustomPainter {
+  const _GlassWaterPainter({required this.progress});
 
   final double progress;
-  final double rippleT;
-  final double dropT;
-  final bool extraRippleLayer;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final bowlRadius = size.width * 0.39;
-    final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
-    final innerRect = outerRect.deflate(11);
+    final innerRect = GlassGauge.innerRectForSize(size);
 
     final airVolumePaint = Paint()
       ..shader = RadialGradient(
@@ -74,9 +85,31 @@ class _GlassGaugePainter extends CustomPainter {
     canvas.save();
     canvas.clipPath(Path()..addOval(innerRect));
     WaterFillPainter(innerRect: innerRect, progress: progress).paint(canvas, size);
+    canvas.restore();
+  }
 
+  @override
+  bool shouldRepaint(covariant _GlassWaterPainter oldDelegate) {
+    return oldDelegate.progress != progress;
+  }
+}
+
+class _GlassRipplePainter extends CustomPainter {
+  const _GlassRipplePainter({
+    required this.progress,
+    required this.rippleT,
+    required this.extraRippleLayer,
+  });
+
+  final double progress;
+  final double rippleT;
+  final bool extraRippleLayer;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final innerRect = GlassGauge.innerRectForSize(size);
     final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
-    final rippleCenter = Offset(center.dx, waterTopY);
+    final rippleCenter = Offset(size.width / 2, waterTopY);
     final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
 
     canvas.save();
@@ -88,49 +121,12 @@ class _GlassGaugePainter extends CustomPainter {
       extraLayer: extraRippleLayer,
     ).paint(canvas, size);
     canvas.restore();
-
-    _paintFallingDrop(canvas, size, waterTopY);
-    canvas.restore();
-
-    GlassBowlPainter(outerRect: outerRect, innerRect: innerRect).paint(canvas, size);
-  }
-
-  void _paintFallingDrop(Canvas canvas, Size size, double waterTopY) {
-    if (dropT <= 0 || dropT >= 1) {
-      return;
-    }
-
-    final bowlCenter = size.center(Offset.zero);
-    final startY = bowlCenter.dy - size.height * 0.43;
-    final endY = waterTopY - 2;
-    final dropY = Tween<double>(begin: startY, end: endY).transform(Curves.easeIn.transform(dropT));
-    final opacity = 1 - Curves.easeIn.transform((dropT * 1.2).clamp(0, 1));
-
-    final dropSize = Size(size.width * 0.06, size.width * 0.09);
-    final dropRect = Rect.fromCenter(center: Offset(bowlCenter.dx, dropY), width: dropSize.width, height: dropSize.height);
-
-    final dropPath = buildTeardropPath(dropSize).shift(dropRect.topLeft);
-    final dropPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          const Color(0xFFE9F8FF).withValues(alpha: 0.65 * opacity),
-          const Color(0xCC8ED8FF).withValues(alpha: opacity),
-          const Color(0xE058A8D8).withValues(alpha: opacity),
-        ],
-      ).createShader(dropRect);
-    canvas.drawPath(dropPath, dropPaint);
-
-    final specPaint = Paint()..color = Colors.white.withValues(alpha: 0.35 * opacity);
-    canvas.drawCircle(dropRect.center.translate(-3, -dropRect.height * 0.2), dropRect.width * 0.12, specPaint);
   }
 
   @override
-  bool shouldRepaint(covariant _GlassGaugePainter oldDelegate) {
+  bool shouldRepaint(covariant _GlassRipplePainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.rippleT != rippleT ||
-        oldDelegate.dropT != dropT ||
         oldDelegate.extraRippleLayer != extraRippleLayer;
   }
 }

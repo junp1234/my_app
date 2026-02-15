@@ -14,6 +14,7 @@ import '../widgets/drop_shot_overlay.dart';
 import '../widgets/overlays/soap_bubbles_overlay.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
+import '../widgets/painters/glass_fallback_ring_painter.dart';
 import '../widgets/painters/water_fill_painter.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import 'history_screen.dart';
@@ -36,6 +37,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  static const double _glassSize = 272;
+
   final _settingsRepo = SettingsRepository.instance;
   final GlobalKey _stackKey = GlobalKey();
   final GlobalKey _dropletKey = GlobalKey();
@@ -212,8 +215,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
-    final glassBox = _glassKey.currentContext?.findRenderObject() as RenderBox?;
-    if (stackBox == null || glassBox == null || !stackBox.hasSize || !glassBox.hasSize) {
+    if (stackBox == null || !stackBox.hasSize) {
       if (_metricsRetryCount < _maxMetricsRetryCount) {
         _metricsRetryCount += 1;
         _queueMetricsUpdate();
@@ -222,9 +224,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     _metricsRetryCount = 0;
-    final stackTopLeft = stackBox.localToGlobal(Offset.zero);
-    final glassTopLeft = glassBox.localToGlobal(Offset.zero);
-    final nextGlassRect = glassTopLeft - stackTopLeft & glassBox.size;
+    final nextGlassRect = Rect.fromCenter(
+      center: stackBox.size.center(Offset.zero),
+      width: _glassSize,
+      height: _glassSize,
+    );
 
     final nextDropStart = _computeDropStart(stackBox);
     final nextDropEnd = _computeDropEnd(_computeProgress(), stackBox.size, glassRect: nextGlassRect);
@@ -237,6 +241,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _glassRectInStack = nextGlassRect;
       _dropStart = nextDropStart;
       _dropEnd = nextDropEnd;
+    });
+  }
+
+  void _syncGlassRectWithLayout(Size size) {
+    final nextGlassRect = Rect.fromCenter(
+      center: size.center(Offset.zero),
+      width: _glassSize,
+      height: _glassSize,
+    );
+    if (_glassRectInStack == nextGlassRect) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _glassRectInStack == nextGlassRect) {
+        return;
+      }
+      setState(() {
+        _glassRectInStack = nextGlassRect;
+      });
     });
   }
 
@@ -465,59 +489,80 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         children: [
           Container(color: Colors.white),
           SafeArea(
-            child: Stack(
-              key: _stackKey,
-              clipBehavior: Clip.none,
-              children: [
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                _syncGlassRectWithLayout(Size(constraints.maxWidth, constraints.maxHeight));
+
+                return Stack(
+                  key: _stackKey,
+                  clipBehavior: Clip.none,
+                  children: [
                 if (progress >= 1.0)
                   const Positioned.fill(
                     child: IgnorePointer(
                       child: SoapBubblesOverlay(),
                     ),
                   ),
-                Center(
-                  child: AnimatedBuilder(
-                    animation: Listenable.merge([_waterCtrl, _rippleCtrl]),
-                    builder: (_, __) => GestureDetector(
-                      onLongPress: _resetTodayTotal,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          GlassGauge(
-                            key: _glassKey,
-                            progress: _animatedWaterLevel,
-                            rippleT: _rippleCtrl.value,
-                            dropT: 0,
+                    Center(
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([_waterCtrl, _rippleCtrl]),
+                        builder: (_, __) => GestureDetector(
+                          key: _glassKey,
+                          onLongPress: _resetTodayTotal,
+                          child: SizedBox(
+                            width: _glassSize,
+                            height: _glassSize,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                GlassGauge(
+                                  progress: _animatedWaterLevel,
+                                  rippleT: _rippleCtrl.value,
+                                  dropT: 0,
+                                  size: _glassSize,
+                                ),
+                                Image.asset(
+                                  'assets/images/glass_empty.png',
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => CustomPaint(
+                                    painter: const GlassFallbackRingPainter(),
+                                  ),
+                                ),
+                                IgnorePointer(
+                                  child: CustomPaint(
+                                    painter: _GlassOutlinePainter(),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                Builder(
-                  builder: (_) {
-                    final metrics = _currentGlassMetrics(_animatedWaterLevel);
-                    final rippleCenter = _rippleCenter;
-                    if (metrics == null || rippleCenter == null || _animatedWaterLevel <= 0) {
-                      return const SizedBox.shrink();
-                    }
-                    final waterBounds = Rect.fromLTRB(
-                      metrics.innerRect.left,
-                      metrics.waterTopY,
-                      metrics.innerRect.right,
-                      metrics.innerRect.bottom,
-                    );
+                    Builder(
+                      builder: (_) {
+                        final metrics = _currentGlassMetrics(_animatedWaterLevel);
+                        final rippleCenter = _rippleCenter;
+                        if (metrics == null || rippleCenter == null || _animatedWaterLevel <= 0) {
+                          return const SizedBox.shrink();
+                        }
+                        final waterBounds = Rect.fromLTRB(
+                          metrics.innerRect.left,
+                          metrics.waterTopY,
+                          metrics.innerRect.right,
+                          metrics.innerRect.bottom,
+                        );
 
-                    return RippleScreenOverlay(
-                      burstT: _rippleCtrl.value,
-                      waterPath: metrics.waterPath,
-                      waterTopY: metrics.waterTopY,
-                      waterBounds: waterBounds,
-                      center: rippleCenter,
-                    );
-                  },
-                ),
-                Positioned.fill(
+                        return RippleScreenOverlay(
+                          burstT: _rippleCtrl.value,
+                          waterPath: metrics.waterPath,
+                          waterTopY: metrics.waterTopY,
+                          waterBounds: waterBounds,
+                          center: rippleCenter,
+                        );
+                      },
+                    ),
+                    Positioned.fill(
                   child: Align(
                     alignment: const Alignment(0, -0.73),
                     child: DropletButton(
@@ -544,7 +589,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                Positioned(
+                    Positioned(
                   top: 8,
                   right: 8,
                   child: Row(
@@ -560,7 +605,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-                Positioned(
+                    Positioned(
                   right: 20,
                   bottom: 180,
                   child: IgnorePointer(
@@ -587,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                Positioned.fill(
+                    Positioned.fill(
                   child: IgnorePointer(
                     child: DropShotOverlay(
                       controller: _dropCtl,
@@ -596,12 +641,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+class _GlassOutlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final outlineRect = Rect.fromCircle(
+      center: size.center(Offset.zero),
+      radius: size.width * 0.39,
+    );
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9
+      ..color = Colors.white.withValues(alpha: 0.28);
+    canvas.drawOval(outlineRect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlassOutlinePainter oldDelegate) {
+    return false;
   }
 }
 
