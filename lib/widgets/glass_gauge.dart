@@ -13,6 +13,7 @@ class GlassGauge extends StatelessWidget {
     required this.dropT,
     this.extraRippleLayer = false,
     this.size = 272,
+    this.onMetrics,
   });
 
   final double progress;
@@ -20,6 +21,7 @@ class GlassGauge extends StatelessWidget {
   final double dropT;
   final bool extraRippleLayer;
   final double size;
+  final ValueChanged<GlassGaugeMetrics>? onMetrics;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +35,7 @@ class GlassGauge extends StatelessWidget {
           rippleT: rippleT,
           dropT: dropT,
           extraRippleLayer: extraRippleLayer,
+          onMetrics: onMetrics,
         ),
       ),
     );
@@ -45,12 +48,14 @@ class _GlassGaugePainter extends CustomPainter {
     required this.rippleT,
     required this.dropT,
     required this.extraRippleLayer,
+    required this.onMetrics,
   });
 
   final double progress;
   final double rippleT;
   final double dropT;
   final bool extraRippleLayer;
+  final ValueChanged<GlassGaugeMetrics>? onMetrics;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -78,6 +83,17 @@ class _GlassGaugePainter extends CustomPainter {
     final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
     final rippleCenter = Offset(center.dx, waterTopY);
     final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
+
+    onMetrics?.call(
+      GlassGaugeMetrics(
+        waterTopY: waterTopY,
+        waterPath: waterPath,
+        glassCenter: center,
+        glassRadius: bowlRadius,
+        innerRect: innerRect,
+      ),
+    );
+
     canvas.save();
     canvas.clipPath(waterPath);
     RipplePainter(
@@ -130,6 +146,23 @@ class _GlassGaugePainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.rippleT != rippleT ||
         oldDelegate.dropT != dropT ||
-        oldDelegate.extraRippleLayer != extraRippleLayer;
+        oldDelegate.extraRippleLayer != extraRippleLayer ||
+        oldDelegate.onMetrics != onMetrics;
   }
+}
+
+class GlassGaugeMetrics {
+  const GlassGaugeMetrics({
+    required this.waterTopY,
+    required this.waterPath,
+    required this.glassCenter,
+    required this.glassRadius,
+    required this.innerRect,
+  });
+
+  final double waterTopY;
+  final Path waterPath;
+  final Offset glassCenter;
+  final double glassRadius;
+  final Rect innerRect;
 }

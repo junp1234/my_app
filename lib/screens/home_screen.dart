@@ -62,12 +62,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Offset? _dropStart;
   Offset? _dropEnd;
   Offset? _rippleCenter;
+  _GlassWaterMetrics? _latestGlassMetrics;
 
   @override
   void initState() {
     super.initState();
     _settings = widget.settings;
     _waterLogService = WaterLogService(widget.repository);
+    _dropCtl.addStatusListener(_onDropStatusChanged);
     _maybeShowProfileOnFirstRun();
     unawaited(_initializeHomeState());
   }
@@ -87,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void dispose() {
     _holdTimer?.cancel();
     _pressCtrl.dispose();
+    _dropCtl.removeStatusListener(_onDropStatusChanged);
     _dropCtl.dispose();
     _waterCtrl.dispose();
     _rippleCtrl.dispose();
@@ -158,11 +161,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..forward();
 
-    final metrics = _buildGlassMetrics(1.0);
+    final metrics = _latestGlassMetrics ?? _buildGlassMetrics(1.0);
     if (metrics != null) {
       _rippleCenter = Offset(metrics.innerRect.center.dx, metrics.waterTopY + 4);
     }
     _rippleCtrl.forward(from: 0);
+  }
+
+
+  void _onDropStatusChanged(AnimationStatus status) {
+    if (status != AnimationStatus.completed) {
+      return;
+    }
+    final splashCenter = _dropEnd;
+    if (splashCenter == null) {
+      return;
+    }
+    setState(() {
+      _rippleCenter = splashCenter;
+    });
+    _rippleCtrl.forward(from: 0);
+  }
+
+  void _updateGlassMetrics(GlassGaugeMetrics metrics) {
+    final stackCtx = _stackKey.currentContext;
+    final glassCtx = _glassKey.currentContext;
+    if (stackCtx == null || glassCtx == null) {
+      return;
+    }
+
+    final stackBox = stackCtx.findRenderObject() as RenderBox?;
+    final glassBox = glassCtx.findRenderObject() as RenderBox?;
+    if (stackBox == null || glassBox == null) {
+      return;
+    }
+
+    final stackTopLeft = stackBox.localToGlobal(Offset.zero);
+    final glassTopLeft = glassBox.localToGlobal(Offset.zero);
+    final delta = glassTopLeft - stackTopLeft;
+
+    _latestGlassMetrics = _GlassWaterMetrics(
+      innerRect: metrics.innerRect.shift(delta),
+      waterTopY: metrics.waterTopY + delta.dy,
+      waterPath: metrics.waterPath.shift(delta),
+      glassCenter: metrics.glassCenter + delta,
+      glassRadius: metrics.glassRadius,
+    );
   }
 
   Offset _clampToScreen(Offset point, Size size) {
@@ -205,24 +249,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Offset _calcGlassWaterSurfacePointInStack() {
     final size = _overlaySizeFallback();
+    final metrics = _latestGlassMetrics ?? _buildGlassMetrics(_animatedWaterLevel);
     final fallback = Offset(size.width / 2, size.height * 0.55);
-    final stackCtx = _stackKey.currentContext;
-    final glassCtx = _glassKey.currentContext;
-    if (stackCtx == null || glassCtx == null) {
+    if (metrics == null) {
       return _clampToScreen(fallback, size);
     }
 
-    final stackBox = stackCtx.findRenderObject() as RenderBox?;
-    final glassBox = glassCtx.findRenderObject() as RenderBox?;
-    if (stackBox == null || glassBox == null) {
-      return _clampToScreen(fallback, size);
-    }
-
-    final stackGlobal = stackBox.localToGlobal(Offset.zero);
-    final glassCenterGlobal = glassBox.localToGlobal(Offset(glassBox.size.width / 2, glassBox.size.height / 2));
-    final waterYGlobal = glassBox.localToGlobal(Offset(glassBox.size.width / 2, glassBox.size.height * 0.35)).dy;
-    final endGlobal = Offset(glassCenterGlobal.dx, waterYGlobal);
-    return _clampToScreen(endGlobal - stackGlobal, size);
+    final clampedY = (metrics.waterTopY + 3).clamp(
+      metrics.innerRect.top + 8,
+      metrics.innerRect.bottom - 8,
+    );
+    final end = Offset(metrics.glassCenter.dx, clampedY.toDouble());
+    return _clampToScreen(end, size);
   }
 
   _GlassWaterMetrics? _buildGlassMetrics(double progress) {
@@ -246,7 +284,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final innerRect = outerRect.deflate(11);
     final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
     final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
-    return _GlassWaterMetrics(innerRect: innerRect, waterTopY: waterTopY, waterPath: waterPath);
+    return _GlassWaterMetrics(
+      innerRect: innerRect,
+      waterTopY: waterTopY,
+      waterPath: waterPath,
+      glassCenter: center,
+      glassRadius: bowlRadius,
+    );
   }
 
   Future<void> _maybeShowProfileOnFirstRun() async {
@@ -318,6 +362,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _canUndo = _intakeHistory.isNotEmpty;
       _dropStart = start;
       _dropEnd = end;
+      _rippleCenter = end;
       _syncWaterAnimation(animate: true, targetProgress: nextProgress);
     });
 
@@ -445,6 +490,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             progress: _animatedWaterLevel,
                             rippleT: _rippleCtrl.value,
                             dropT: 0,
+                            onMetrics: _updateGlassMetrics,
                           ),
                         ],
                       ),
@@ -453,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 Builder(
                   builder: (_) {
-                    final metrics = _buildGlassMetrics(_animatedWaterLevel);
+                    final metrics = _latestGlassMetrics ?? _buildGlassMetrics(_animatedWaterLevel);
                     final rippleCenter = _rippleCenter;
                     if (metrics == null || rippleCenter == null || _animatedWaterLevel <= 0) {
                       return const SizedBox.shrink();
@@ -551,9 +597,13 @@ class _GlassWaterMetrics {
     required this.innerRect,
     required this.waterTopY,
     required this.waterPath,
+    required this.glassCenter,
+    required this.glassRadius,
   });
 
   final Rect innerRect;
   final double waterTopY;
   final Path waterPath;
+  final Offset glassCenter;
+  final double glassRadius;
 }

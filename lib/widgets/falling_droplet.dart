@@ -116,16 +116,16 @@ class _FallingDropletPainter extends CustomPainter {
       )
       ..close();
 
-    canvas.drawShadow(dropPath, Colors.black.withValues(alpha: 0.08), 2.4, false);
+    canvas.drawShadow(dropPath, Colors.black.withValues(alpha: 0.12), 2.4, false);
 
-    final dropFill = Color.lerp(WaterTheme.waterTopColor, Colors.white, 0.10) ?? WaterTheme.waterTopColor;
+    final dropFill = Color.lerp(WaterTheme.waterTopColor, Colors.white, 0.06) ?? WaterTheme.waterTopColor;
     final fillPaint = Paint()
-      ..color = dropFill.withValues(alpha: 0.74)
+      ..color = dropFill.withValues(alpha: 0.86)
       ..style = PaintingStyle.fill;
     canvas.drawPath(dropPath, fillPaint);
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.16)
+      ..color = Colors.white.withValues(alpha: 0.22)
       ..style = PaintingStyle.fill;
     canvas.drawOval(
       Rect.fromLTWH(
