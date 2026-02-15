@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/water_theme.dart';
+
 class FallingDroplet extends StatefulWidget {
   const FallingDroplet({
     super.key,
@@ -7,7 +9,7 @@ class FallingDroplet extends StatefulWidget {
     required this.start,
     required this.end,
     required this.onSplash,
-    this.size = 12,
+    this.size = 16,
   });
 
   final AnimationController controller;
@@ -63,12 +65,9 @@ class _FallingDropletState extends State<FallingDroplet> {
           Tween<double>(begin: widget.start.dx, end: widget.end.dx).transform(eased),
           Tween<double>(begin: widget.start.dy, end: widget.end.dy).transform(eased),
         );
-        final opacity = Tween<double>(begin: 1, end: 0.25).transform(t);
-
         return CustomPaint(
           painter: _FallingDropletPainter(
             current: current,
-            opacity: opacity,
             size: widget.size,
           ),
           child: const SizedBox.expand(),
@@ -81,29 +80,44 @@ class _FallingDropletState extends State<FallingDroplet> {
 class _FallingDropletPainter extends CustomPainter {
   const _FallingDropletPainter({
     required this.current,
-    required this.opacity,
     required this.size,
   });
 
   final Offset current;
-  final double opacity;
   final double size;
 
   @override
   void paint(Canvas canvas, Size canvasSize) {
-    final dropPaint = Paint()
-      ..color = const Color(0xCC8ED8FF).withValues(alpha: opacity)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(current, size / 2, dropPaint);
+    final radius = size / 2;
 
-    final debugPaint = Paint()
-      ..color = Colors.red.withValues(alpha: 0.8)
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+    canvas.drawCircle(current + const Offset(0, 3), radius, shadowPaint);
+
+    final dropPaint = Paint()
+      ..color = WaterTheme.deepBlue.withValues(alpha: 0.98)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(current, 6, debugPaint);
+    canvas.drawCircle(current, radius, dropPaint);
+
+    final borderPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawCircle(current, radius, borderPaint);
+
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.68)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(
+      current + Offset(-radius * 0.35, -radius * 0.35),
+      radius * 0.28,
+      highlightPaint,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _FallingDropletPainter oldDelegate) {
-    return oldDelegate.current != current || oldDelegate.opacity != opacity || oldDelegate.size != size;
+    return oldDelegate.current != current || oldDelegate.size != size;
   }
 }

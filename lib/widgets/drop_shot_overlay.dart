@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/water_theme.dart';
+
 class DropShotOverlay extends StatelessWidget {
   const DropShotOverlay({
     super.key,
@@ -17,8 +19,6 @@ class DropShotOverlay extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
-        debugPrint('DROP t=${controller.value}');
-
         final begin = start;
         final finish = end;
         final hidden = controller.value == 0 || controller.value == 1 || begin == null || finish == null;
@@ -32,13 +32,14 @@ class DropShotOverlay extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
+        const dropletSize = 16.0;
         return Stack(
           clipBehavior: Clip.none,
           children: [
             Positioned(
-              left: position.dx - 6,
-              top: position.dy - 6,
-              child: const _DropDot(),
+              left: position.dx - (dropletSize / 2),
+              top: position.dy - (dropletSize / 2),
+              child: const _DropDot(size: dropletSize),
             ),
           ],
         );
@@ -48,16 +49,42 @@ class DropShotOverlay extends StatelessWidget {
 }
 
 class _DropDot extends StatelessWidget {
-  const _DropDot();
+  const _DropDot({required this.size});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 12,
-      height: 12,
-      decoration: const BoxDecoration(
-        color: Color(0xD6E8F7FF),
-        shape: BoxShape.circle,
+    final radius = size / 2;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: WaterTheme.deepBlue.withValues(alpha: 0.98),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.22),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Container(
+            width: radius * 0.56,
+            height: radius * 0.56,
+            margin: EdgeInsets.only(left: radius * 0.22, top: radius * 0.22),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.68),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
       ),
     );
   }
