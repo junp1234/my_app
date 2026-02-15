@@ -32,14 +32,14 @@ class DropShotOverlay extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        const dropletSize = 16.0;
+        const dropletSize = 12.0;
         return Stack(
           clipBehavior: Clip.none,
           children: [
             Positioned(
               left: position.dx - (dropletSize / 2),
-              top: position.dy - (dropletSize / 2),
-              child: const _DropDot(size: dropletSize),
+              top: position.dy - ((dropletSize * 1.25) / 2),
+              child: const _DropTear(size: dropletSize),
             ),
           ],
         );
@@ -48,44 +48,78 @@ class DropShotOverlay extends StatelessWidget {
   }
 }
 
-class _DropDot extends StatelessWidget {
-  const _DropDot({required this.size});
+class _DropTear extends StatelessWidget {
+  const _DropTear({required this.size});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final radius = size / 2;
-
     return SizedBox(
       width: size,
-      height: size,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: WaterTheme.deepBlue.withValues(alpha: 0.98),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.22),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: Container(
-            width: radius * 0.56,
-            height: radius * 0.56,
-            margin: EdgeInsets.only(left: radius * 0.22, top: radius * 0.22),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.68),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
+      height: size * 1.25,
+      child: CustomPaint(
+        painter: _DropTearPainter(size: size),
       ),
     );
+  }
+}
+
+class _DropTearPainter extends CustomPainter {
+  const _DropTearPainter({required this.size});
+
+  final double size;
+
+  @override
+  void paint(Canvas canvas, Size canvasSize) {
+    final w = size;
+    final h = size * 1.25;
+    final cx = canvasSize.width / 2;
+    final cy = canvasSize.height / 2;
+
+    final path = Path()
+      ..moveTo(cx, cy - h * 0.55)
+      ..cubicTo(
+        cx + w * 0.45,
+        cy - h * 0.35,
+        cx + w * 0.55,
+        cy + h * 0.10,
+        cx,
+        cy + h * 0.55,
+      )
+      ..cubicTo(
+        cx - w * 0.55,
+        cy + h * 0.10,
+        cx - w * 0.45,
+        cy - h * 0.35,
+        cx,
+        cy - h * 0.55,
+      )
+      ..close();
+
+    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.12), 3, false);
+
+    final fillPaint = Paint()
+      ..color = WaterTheme.deepBlue.withValues(alpha: 0.90)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fillPaint);
+
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.28)
+      ..style = PaintingStyle.fill;
+    canvas.drawOval(
+      Rect.fromLTWH(
+        cx - w * 0.28,
+        cy - h * 0.35,
+        w * 0.24,
+        h * 0.42,
+      ),
+      highlightPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DropTearPainter oldDelegate) {
+    return oldDelegate.size != size;
   }
 }

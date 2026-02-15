@@ -9,7 +9,7 @@ class FallingDroplet extends StatefulWidget {
     required this.start,
     required this.end,
     required this.onSplash,
-    this.size = 16,
+    this.size = 12,
   });
 
   final AnimationController controller;
@@ -88,30 +88,48 @@ class _FallingDropletPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size canvasSize) {
-    final radius = size / 2;
+    final w = size;
+    final h = size * 1.25;
+    final cx = current.dx;
+    final cy = current.dy;
 
-    final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.22)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-    canvas.drawCircle(current + const Offset(0, 3), radius, shadowPaint);
+    final dropPath = Path()
+      ..moveTo(cx, cy - h * 0.55)
+      ..cubicTo(
+        cx + w * 0.45,
+        cy - h * 0.35,
+        cx + w * 0.55,
+        cy + h * 0.10,
+        cx,
+        cy + h * 0.55,
+      )
+      ..cubicTo(
+        cx - w * 0.55,
+        cy + h * 0.10,
+        cx - w * 0.45,
+        cy - h * 0.35,
+        cx,
+        cy - h * 0.55,
+      )
+      ..close();
 
-    final dropPaint = Paint()
-      ..color = WaterTheme.deepBlue.withValues(alpha: 0.98)
+    canvas.drawShadow(dropPath, Colors.black.withValues(alpha: 0.12), 3, false);
+
+    final fillPaint = Paint()
+      ..color = WaterTheme.deepBlue.withValues(alpha: 0.90)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(current, radius, dropPaint);
-
-    final borderPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.45)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    canvas.drawCircle(current, radius, borderPaint);
+    canvas.drawPath(dropPath, fillPaint);
 
     final highlightPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.68)
+      ..color = Colors.white.withValues(alpha: 0.28)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(
-      current + Offset(-radius * 0.35, -radius * 0.35),
-      radius * 0.28,
+    canvas.drawOval(
+      Rect.fromLTWH(
+        cx - w * 0.28,
+        cy - h * 0.35,
+        w * 0.24,
+        h * 0.42,
+      ),
       highlightPaint,
     );
   }
