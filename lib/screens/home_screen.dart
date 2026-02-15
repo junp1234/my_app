@@ -173,11 +173,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..forward();
   }
 
+  Offset _clampToScreen(Offset point, Size size) {
+    return Offset(
+      point.dx.clamp(0.0, size.width),
+      point.dy.clamp(0.0, size.height),
+    );
+  }
+
+  Size _overlaySizeFallback() {
+    final stackCtx = _overlayKey.currentContext;
+    if (stackCtx != null) {
+      final stackBox = stackCtx.findRenderObject() as RenderBox;
+      return stackBox.size;
+    }
+    final mediaSize = MediaQuery.sizeOf(context);
+    return mediaSize;
+  }
+
   Offset _getAddButtonBottomCenter() {
+    final fallbackSize = _overlaySizeFallback();
+    final fallback = Offset(fallbackSize.width / 2, 80);
     final btnCtx = _addButtonKey.currentContext;
     final stackCtx = _overlayKey.currentContext;
     if (btnCtx == null || stackCtx == null) {
-      return const Offset(0, 0);
+      return _clampToScreen(fallback, fallbackSize);
     }
 
     final btnBox = btnCtx.findRenderObject() as RenderBox;
@@ -187,7 +206,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final stackBox = stackCtx.findRenderObject() as RenderBox;
     final stackTopLeftGlobal = stackBox.localToGlobal(Offset.zero);
 
-    return btnBottomCenterGlobal - stackTopLeftGlobal;
+    return _clampToScreen(btnBottomCenterGlobal - stackTopLeftGlobal, fallbackSize);
+  }
+
+  Offset _getSplashPointOnWaterSurface(double nextProgress) {
+    final size = _overlaySizeFallback();
+    final fallback = Offset(size.width / 2, size.height * 0.55);
+    final metrics = _buildGlassMetrics(nextProgress);
+    if (metrics == null) {
+      return _clampToScreen(fallback, size);
+    }
+    return _clampToScreen(Offset(metrics.innerRect.center.dx, metrics.waterTopY + 4), size);
   }
 
   _GlassWaterMetrics? _buildGlassMetrics(double progress) {
@@ -274,9 +303,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     HapticFeedback.selectionClick();
-    final metrics = _buildGlassMetrics(nextProgress);
     final start = _getAddButtonBottomCenter();
-    final end = metrics == null ? const Offset(0, 0) : Offset(metrics.innerRect.center.dx, metrics.waterTopY + 4);
+    final end = _getSplashPointOnWaterSurface(nextProgress);
 
     setState(() {
       _todayTotalMl = nextTotal;
@@ -288,13 +316,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _syncWaterAnimation(animate: true, targetProgress: nextProgress);
     });
 
-    debugPrint('DROP start=$start end=$end');
+    debugPrint('DROP seq=$_dropSeq start=$_dropStart end=$_dropEnd');
+    debugPrint('DROP ctl(before)=${_dropCtrl.value}');
     debugPrint('ADD pressed -> start drop seq=$_dropSeq total=$nextTotal goal=$goal');
 
     _dropCtrl
       ..stop()
       ..reset()
       ..forward();
+    debugPrint('DROP ctl(after)=${_dropCtrl.value}');
 
     _handleGoalCrossing(totalMl: nextTotal, goalMl: goal);
   }
@@ -367,6 +397,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       body: Stack(
+        clipBehavior: Clip.none,
         children: [
           Container(
             decoration: BoxDecoration(
@@ -383,6 +414,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           SafeArea(
             child: Stack(
               key: _overlayKey,
+              clipBehavior: Clip.none,
               children: [
                 Positioned(
                   top: 8,
@@ -418,13 +450,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                if (_dropStart != null && _dropEnd != null)
-                  FallingDroplet(
-                    controller: _dropCtrl,
-                    start: _dropStart!,
-                    end: _dropEnd!,
-                    onSplash: _triggerRipple,
-                  ),
                 Builder(
                   builder: (_) {
                     final metrics = _buildGlassMetrics(_animatedWaterLevel);
@@ -502,6 +527,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
+                if (_dropStart != null && _dropEnd != null)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: FallingDroplet(
+                        key: ValueKey(_dropSeq),
+                        controller: _dropCtrl,
+                        start: _dropStart!,
+                        end: _dropEnd!,
+                        size: 12,
+                        onSplash: _triggerRipple,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
