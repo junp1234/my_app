@@ -63,7 +63,6 @@ class _RippleScreenPainter extends CustomPainter {
     final bottomLimit = waterBounds.bottom - center.dy;
     final sideLimit = math.min(center.dx - waterBounds.left, waterBounds.right - center.dx);
     final rippleMaxRadius = math.max(0.0, math.min(sideLimit, math.min(topLimit, bottomLimit)) - margin);
-    debugPrint('RIPPLE center=$center maxR=$rippleMaxRadius');
 
     canvas.save();
     canvas.clipPath(waterPath);
