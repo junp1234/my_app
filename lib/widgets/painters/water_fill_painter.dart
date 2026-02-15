@@ -111,6 +111,20 @@ class WaterFillPainter extends CustomPainter {
       ).createShader(waterRect);
     canvas.drawPath(waterPath, depthShadowPaint);
 
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..color = Colors.white.withValues(alpha: 0.10)
+      ..isAntiAlias = true;
+    canvas.drawPath(waterPath, glowPaint);
+
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = Colors.white.withValues(alpha: 0.46)
+      ..isAntiAlias = true;
+    canvas.drawPath(waterPath, borderPaint);
+
     _paintSurfaceGlitter(canvas, waterPath, waterTopY, centerX, full);
 
     if (full) {

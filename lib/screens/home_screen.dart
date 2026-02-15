@@ -463,22 +463,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               key: _stackKey,
               clipBehavior: Clip.none,
               children: [
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: _openHistory,
-                        icon: const Icon(Icons.bar_chart_rounded),
-                      ),
-                      IconButton(
-                        onPressed: _openProfile,
-                        icon: const Icon(Icons.settings_outlined),
-                      ),
-                    ],
+                if (progress >= 1.0)
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: FullBubblesOverlay(),
+                    ),
                   ),
-                ),
                 Center(
                   child: AnimatedBuilder(
                     animation: Listenable.merge([_waterCtrl, _rippleCtrl]),
@@ -550,6 +540,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ),
                 Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: _openHistory,
+                        icon: const Icon(Icons.bar_chart_rounded),
+                      ),
+                      IconButton(
+                        onPressed: _openProfile,
+                        icon: const Icon(Icons.settings_outlined),
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned(
                   right: 20,
                   bottom: 180,
                   child: IgnorePointer(
@@ -585,12 +591,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                if (progress >= 1.0)
-                  const Positioned.fill(
-                    child: IgnorePointer(
-                      child: FullBubblesOverlay(),
-                    ),
-                  ),
               ],
             ),
           ),

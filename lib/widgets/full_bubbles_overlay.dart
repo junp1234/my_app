@@ -31,15 +31,15 @@ class _FullBubblesOverlayState extends State<FullBubblesOverlay> with SingleTick
     final random = math.Random(90210);
     return List<_BubbleSpec>.generate(_bubbleCount, (_) {
       final size = lerpDouble(2, 10, random.nextDouble())!;
-      final alpha = lerpDouble(0.12, 0.35, random.nextDouble())!;
+      final alpha = lerpDouble(0.10, 0.30, random.nextDouble())!;
       return _BubbleSpec(
         x: random.nextDouble(),
         baseSize: size,
-        speed: lerpDouble(0.3, 1.2, random.nextDouble())!,
+        speed: lerpDouble(0.8, 1.33, random.nextDouble())!,
         phase: random.nextDouble(),
         drift: random.nextDouble(),
         alpha: alpha,
-        strokeWidth: lerpDouble(1.0, 2.0, random.nextDouble())!,
+        strokeWidth: lerpDouble(0.8, 1.4, random.nextDouble())!,
       );
     });
   }
@@ -84,8 +84,8 @@ class _FullBubblesPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0x52D8F1FF),
-          Color(0x66BFE9FF),
+          Color(0x33D8F1FF),
+          Color(0x52BFE9FF),
         ],
       ).createShader(rect);
     canvas.drawRect(rect, background);
