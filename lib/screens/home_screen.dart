@@ -11,6 +11,7 @@ import '../services/daily_totals_service.dart';
 import '../services/settings_repository.dart';
 import '../services/water_log_service.dart';
 import '../widgets/drop_shot_overlay.dart';
+import '../widgets/full_bubbles_overlay.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/painters/water_fill_painter.dart';
@@ -437,6 +438,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final progress = _computeProgress();
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
@@ -583,6 +585,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
+                if (progress >= 1.0)
+                  const Positioned.fill(
+                    child: IgnorePointer(
+                      child: FullBubblesOverlay(),
+                    ),
+                  ),
               ],
             ),
           ),
