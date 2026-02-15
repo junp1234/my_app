@@ -10,8 +10,8 @@ import '../models/app_settings.dart';
 import '../services/daily_totals_service.dart';
 import '../services/settings_repository.dart';
 import '../services/water_log_service.dart';
+import '../widgets/drop_shot_overlay.dart';
 import '../widgets/droplet_button.dart';
-import '../widgets/falling_droplet.dart';
 import '../widgets/glass_gauge.dart';
 import '../widgets/painters/water_fill_painter.dart';
 import '../widgets/ripple_screen_overlay.dart';
@@ -36,8 +36,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final _settingsRepo = SettingsRepository.instance;
-  final GlobalKey _overlayKey = GlobalKey();
-  final GlobalKey _addButtonKey = GlobalKey();
+  final GlobalKey _stackKey = GlobalKey();
+  final GlobalKey _addKey = GlobalKey();
+  final GlobalKey _glassKey = GlobalKey();
 
   late AppSettings _settings;
   int _todayTotalMl = 0;
@@ -45,7 +46,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _todayCount = 0;
   bool _canUndo = false;
   bool _wasGoalReached = false;
-  int _dropSeq = 0;
   final List<int> _intakeHistory = [];
 
   late final WaterLogService _waterLogService;
@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isHolding = false;
 
   late final AnimationController _pressCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 120));
-  late final AnimationController _dropCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+  late final AnimationController _dropCtl = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
   late final AnimationController _waterCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
   late final AnimationController _rippleCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 460));
 
@@ -87,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void dispose() {
     _holdTimer?.cancel();
     _pressCtrl.dispose();
-    _dropCtrl.dispose();
+    _dropCtl.dispose();
     _waterCtrl.dispose();
     _rippleCtrl.dispose();
     super.dispose();
@@ -165,14 +165,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _rippleCtrl.forward(from: 0);
   }
 
-  void _triggerRipple(Offset center) {
-    _rippleCenter = center;
-    _rippleCtrl
-      ..stop()
-      ..reset()
-      ..forward();
-  }
-
   Offset _clampToScreen(Offset point, Size size) {
     return Offset(
       point.dx.clamp(0.0, size.width),
@@ -181,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Size _overlaySizeFallback() {
-    final stackCtx = _overlayKey.currentContext;
+    final stackCtx = _stackKey.currentContext;
     if (stackCtx != null) {
       final stackBox = stackCtx.findRenderObject() as RenderBox;
       return stackBox.size;
@@ -190,37 +182,51 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return mediaSize;
   }
 
-  Offset _getAddButtonBottomCenter() {
+  Offset _calcAddBottomCenterInStack() {
     final fallbackSize = _overlaySizeFallback();
     final fallback = Offset(fallbackSize.width / 2, 80);
-    final btnCtx = _addButtonKey.currentContext;
-    final stackCtx = _overlayKey.currentContext;
+    final btnCtx = _addKey.currentContext;
+    final stackCtx = _stackKey.currentContext;
     if (btnCtx == null || stackCtx == null) {
       return _clampToScreen(fallback, fallbackSize);
     }
 
-    final btnBox = btnCtx.findRenderObject() as RenderBox;
-    final btnTopLeftGlobal = btnBox.localToGlobal(Offset.zero);
-    final btnBottomCenterGlobal = btnTopLeftGlobal + Offset(btnBox.size.width / 2, btnBox.size.height);
+    final btnBox = btnCtx.findRenderObject() as RenderBox?;
+    final stackBox = stackCtx.findRenderObject() as RenderBox?;
+    if (btnBox == null || stackBox == null) {
+      return _clampToScreen(fallback, fallbackSize);
+    }
 
-    final stackBox = stackCtx.findRenderObject() as RenderBox;
+    final btnBottomCenterGlobal = btnBox.localToGlobal(Offset(btnBox.size.width / 2, btnBox.size.height));
     final stackTopLeftGlobal = stackBox.localToGlobal(Offset.zero);
 
     return _clampToScreen(btnBottomCenterGlobal - stackTopLeftGlobal, fallbackSize);
   }
 
-  Offset _getSplashPointOnWaterSurface(double nextProgress) {
+  Offset _calcGlassWaterSurfacePointInStack() {
     final size = _overlaySizeFallback();
     final fallback = Offset(size.width / 2, size.height * 0.55);
-    final metrics = _buildGlassMetrics(nextProgress);
-    if (metrics == null) {
+    final stackCtx = _stackKey.currentContext;
+    final glassCtx = _glassKey.currentContext;
+    if (stackCtx == null || glassCtx == null) {
       return _clampToScreen(fallback, size);
     }
-    return _clampToScreen(Offset(metrics.innerRect.center.dx, metrics.waterTopY + 4), size);
+
+    final stackBox = stackCtx.findRenderObject() as RenderBox?;
+    final glassBox = glassCtx.findRenderObject() as RenderBox?;
+    if (stackBox == null || glassBox == null) {
+      return _clampToScreen(fallback, size);
+    }
+
+    final stackGlobal = stackBox.localToGlobal(Offset.zero);
+    final glassCenterGlobal = glassBox.localToGlobal(Offset(glassBox.size.width / 2, glassBox.size.height / 2));
+    final waterYGlobal = glassBox.localToGlobal(Offset(glassBox.size.width / 2, glassBox.size.height * 0.35)).dy;
+    final endGlobal = Offset(glassCenterGlobal.dx, waterYGlobal);
+    return _clampToScreen(endGlobal - stackGlobal, size);
   }
 
   _GlassWaterMetrics? _buildGlassMetrics(double progress) {
-    final stackCtx = _overlayKey.currentContext;
+    final stackCtx = _stackKey.currentContext;
     if (stackCtx == null) {
       return null;
     }
@@ -303,28 +309,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     HapticFeedback.selectionClick();
-    final start = _getAddButtonBottomCenter();
-    final end = _getSplashPointOnWaterSurface(nextProgress);
+    final start = _calcAddBottomCenterInStack();
+    final end = _calcGlassWaterSurfacePointInStack();
 
     setState(() {
       _todayTotalMl = nextTotal;
       _todayCount = nextCount;
-      _dropSeq += 1;
       _canUndo = _intakeHistory.isNotEmpty;
       _dropStart = start;
       _dropEnd = end;
       _syncWaterAnimation(animate: true, targetProgress: nextProgress);
     });
 
-    debugPrint('DROP seq=$_dropSeq start=$_dropStart end=$_dropEnd');
-    debugPrint('DROP ctl(before)=${_dropCtrl.value}');
-    debugPrint('ADD pressed -> start drop seq=$_dropSeq total=$nextTotal goal=$goal');
-
-    _dropCtrl
+    debugPrint('DROP start=$_dropStart end=$_dropEnd');
+    _dropCtl
       ..stop()
-      ..reset()
-      ..forward();
-    debugPrint('DROP ctl(after)=${_dropCtrl.value}');
+      ..forward(from: 0);
 
     _handleGoalCrossing(totalMl: nextTotal, goalMl: goal);
   }
@@ -413,7 +413,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           SafeArea(
             child: Stack(
-              key: _overlayKey,
+              key: _stackKey,
               clipBehavior: Clip.none,
               children: [
                 Positioned(
@@ -434,13 +434,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 Center(
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([_waterCtrl, _rippleCtrl, _dropCtrl]),
+                    animation: Listenable.merge([_waterCtrl, _rippleCtrl]),
                     builder: (_, __) => GestureDetector(
                       onLongPress: _resetTodayTotal,
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
                           GlassGauge(
+                            key: _glassKey,
                             progress: _animatedWaterLevel,
                             rippleT: _rippleCtrl.value,
                             dropT: 0,
@@ -477,7 +478,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Align(
                     alignment: const Alignment(0, -0.73),
                     child: DropletButton(
-                      key: _addButtonKey,
+                      key: _addKey,
                       scale: pressScale * holdScale,
                       isPressed: _pressCtrl.isAnimating || _isHolding,
                       onTap: _addWater,
@@ -527,19 +528,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                if (_dropStart != null && _dropEnd != null)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: FallingDroplet(
-                        key: ValueKey(_dropSeq),
-                        controller: _dropCtrl,
-                        start: _dropStart!,
-                        end: _dropEnd!,
-                        size: 12,
-                        onSplash: _triggerRipple,
-                      ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DropShotOverlay(
+                      controller: _dropCtl,
+                      start: _dropStart,
+                      end: _dropEnd,
                     ),
                   ),
+                ),
               ],
             ),
           ),
