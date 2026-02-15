@@ -14,6 +14,7 @@ import '../widgets/drop_shot_overlay.dart';
 import '../widgets/overlays/soap_bubbles_overlay.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
+import '../widgets/painters/water_fill_painter.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -62,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Offset? _dropStart;
   Offset? _dropEnd;
   Offset? _rippleCenter;
-  _GlassWaterMetrics? _latestGlassMetrics;
+  Rect? _glassRectInStack;
   bool _metricsUpdateQueued = false;
   int _metricsRetryCount = 0;
   static const int _maxMetricsRetryCount = 8;
@@ -146,6 +147,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _todayTotalMl = total;
       _todayCount = count;
       _canUndo = _intakeHistory.isNotEmpty;
+      _dropEnd = _computeDropEnd(progress, _stackSize() ?? Size.zero) ?? _dropEnd;
       _syncWaterAnimation(animate: animate, targetProgress: progress);
     });
 
@@ -172,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ..reset()
       ..forward();
 
-    final metrics = _latestGlassMetrics;
+    final metrics = _currentGlassMetrics(_animatedWaterLevel);
     if (metrics != null) {
       _rippleCenter = Offset(metrics.innerRect.center.dx, metrics.waterTopY + 4);
     }
@@ -193,40 +195,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _rippleCtrl.forward(from: 0);
   }
 
-  void _updateGlassMetrics(GlassGaugeMetrics metrics) {
-    if (!mounted) {
-      return;
-    }
-    final stackCtx = _stackKey.currentContext;
-    final glassCtx = _glassKey.currentContext;
-    if (stackCtx == null || glassCtx == null) {
-      _queueMetricsUpdate();
-      return;
-    }
-
-    final stackBox = stackCtx.findRenderObject() as RenderBox?;
-    final glassBox = glassCtx.findRenderObject() as RenderBox?;
-    if (stackBox == null || glassBox == null || !stackBox.hasSize || !glassBox.hasSize) {
-      _queueMetricsUpdate();
-      return;
-    }
-
-    final stackTopLeft = stackBox.localToGlobal(Offset.zero);
-    final glassTopLeft = glassBox.localToGlobal(Offset.zero);
-    final delta = glassTopLeft - stackTopLeft;
-
-    _latestGlassMetrics = _GlassWaterMetrics(
-      innerRect: metrics.innerRect.shift(delta),
-      waterTopY: metrics.waterTopY + delta.dy,
-      waterPath: metrics.waterPath.shift(delta),
-      glassCenter: metrics.glassCenter + delta,
-      glassRadius: metrics.glassRadius,
-    );
-
-    _metricsRetryCount = 0;
-    _updateDropMetricsFromCache();
-  }
-
   void _queueMetricsUpdate() {
     if (_metricsUpdateQueued || !mounted) {
       return;
@@ -234,23 +202,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _metricsUpdateQueued = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _metricsUpdateQueued = false;
-      _updateDropMetricsFromLayout();
+      _updateGlassMetricsFromLayout();
     });
   }
 
-  void _updateDropMetricsFromLayout() {
+  void _updateGlassMetricsFromLayout() {
     if (!mounted) {
       return;
     }
 
-    final dropletBox = _dropletKey.currentContext?.findRenderObject() as RenderBox?;
     final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
-    final glassMetrics = _latestGlassMetrics;
-    if (dropletBox == null ||
-        stackBox == null ||
-        glassMetrics == null ||
-        !dropletBox.hasSize ||
-        !stackBox.hasSize) {
+    final glassBox = _glassKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox == null || glassBox == null || !stackBox.hasSize || !glassBox.hasSize) {
       if (_metricsRetryCount < _maxMetricsRetryCount) {
         _metricsRetryCount += 1;
         _queueMetricsUpdate();
@@ -259,45 +222,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     _metricsRetryCount = 0;
-    _updateDropMetricsFromCache();
-  }
+    final stackTopLeft = stackBox.localToGlobal(Offset.zero);
+    final glassTopLeft = glassBox.localToGlobal(Offset.zero);
+    final nextGlassRect = glassTopLeft - stackTopLeft & glassBox.size;
 
-  void _updateDropMetricsFromCache() {
-    final dropletBox = _dropletKey.currentContext?.findRenderObject() as RenderBox?;
-    final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
-    final glassMetrics = _latestGlassMetrics;
-    if (dropletBox == null ||
-        stackBox == null ||
-        glassMetrics == null ||
-        !dropletBox.hasSize ||
-        !stackBox.hasSize ||
-        !mounted) {
+    final nextDropStart = _computeDropStart(stackBox);
+    final nextDropEnd = _computeDropEnd(_computeProgress(), stackBox.size, glassRect: nextGlassRect);
+
+    if (_glassRectInStack == nextGlassRect && _dropStart == nextDropStart && _dropEnd == nextDropEnd) {
       return;
     }
 
+    setState(() {
+      _glassRectInStack = nextGlassRect;
+      _dropStart = nextDropStart;
+      _dropEnd = nextDropEnd;
+    });
+  }
+
+  Offset? _computeDropStart(RenderBox stackBox) {
+    final dropletBox = _dropletKey.currentContext?.findRenderObject() as RenderBox?;
+    if (dropletBox == null || !dropletBox.hasSize || !stackBox.hasSize) {
+      return null;
+    }
+
     final stackTopLeftGlobal = stackBox.localToGlobal(Offset.zero);
-    final dropStart = _clampToScreen(
+    return _clampToScreen(
       dropletBox.localToGlobal(Offset(dropletBox.size.width / 2, dropletBox.size.height)) - stackTopLeftGlobal,
       stackBox.size,
     );
+  }
+
+  Offset? _computeDropEnd(double progress, Size stackSize, {Rect? glassRect}) {
+    final glassMetrics = _currentGlassMetrics(progress, glassRect: glassRect);
+    if (glassMetrics == null) {
+      return null;
+    }
 
     final clampedY = (glassMetrics.waterTopY + 3).clamp(
       glassMetrics.innerRect.top + 8,
       glassMetrics.innerRect.bottom - 8,
     );
-    final dropEnd = _clampToScreen(
+    return _clampToScreen(
       Offset(glassMetrics.glassCenter.dx, clampedY.toDouble()),
-      stackBox.size,
+      stackSize,
     );
+  }
 
-    if (_dropStart == dropStart && _dropEnd == dropEnd) {
-      return;
+  _GlassWaterMetrics? _currentGlassMetrics(double progress, {Rect? glassRect}) {
+    glassRect ??= _glassRectInStack;
+    if (glassRect == null) {
+      return null;
     }
 
-    setState(() {
-      _dropStart = dropStart;
-      _dropEnd = dropEnd;
-    });
+    final center = glassRect.center;
+    final bowlRadius = glassRect.width * 0.39;
+    final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
+    final innerRect = outerRect.deflate(11);
+    final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
+    final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
+
+    return _GlassWaterMetrics(
+      innerRect: innerRect,
+      waterTopY: waterTopY,
+      waterPath: waterPath,
+      glassCenter: center,
+      glassRadius: bowlRadius,
+    );
+  }
+
+  Size? _stackSize() {
+    final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox == null || !stackBox.hasSize) {
+      return null;
+    }
+    return stackBox.size;
   }
 
   Offset _clampToScreen(Offset point, Size size) {
@@ -367,13 +366,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     HapticFeedback.selectionClick();
-    final start = _dropStart;
-    final end = _dropEnd;
+    final stackBox = _stackKey.currentContext?.findRenderObject() as RenderBox?;
+    Offset? start = _dropStart;
+    Offset? end = _dropEnd;
+    if (stackBox != null && stackBox.hasSize) {
+      start = _computeDropStart(stackBox);
+      end = _computeDropEnd(_animatedWaterLevel, stackBox.size);
+    }
 
     setState(() {
       _todayTotalMl = nextTotal;
       _todayCount = nextCount;
       _canUndo = _intakeHistory.isNotEmpty;
+      _dropStart = start;
+      _dropEnd = end;
       _rippleCenter = end;
       _syncWaterAnimation(animate: true, targetProgress: nextProgress);
     });
@@ -482,7 +488,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             progress: _animatedWaterLevel,
                             rippleT: _rippleCtrl.value,
                             dropT: 0,
-                            onMetrics: _updateGlassMetrics,
                           ),
                         ],
                       ),
@@ -491,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 Builder(
                   builder: (_) {
-                    final metrics = _latestGlassMetrics;
+                    final metrics = _currentGlassMetrics(_animatedWaterLevel);
                     final rippleCenter = _rippleCenter;
                     if (metrics == null || rippleCenter == null || _animatedWaterLevel <= 0) {
                       return const SizedBox.shrink();
