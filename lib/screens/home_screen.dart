@@ -510,7 +510,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Text(
                 '$percentValue%',
                 style: TextStyle(
-                  fontSize: glassSize * 0.18,
+                  fontSize: glassSize * 0.14,
+                  letterSpacing: 0.5,
                   fontWeight: FontWeight.w800,
                   color: const Color(0xFFFFFFFF),
                   shadows: const [
