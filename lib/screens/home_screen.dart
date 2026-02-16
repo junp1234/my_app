@@ -359,6 +359,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return goal <= 0 ? 0.0 : (_todayTotalMl / goal).clamp(0.0, 1.0).toDouble();
   }
 
+  double _computeRawProgress() {
+    final goal = _dailyGoalMl;
+    if (goal <= 0) {
+      return 0.0;
+    }
+    return math.max(0.0, _todayTotalMl / goal);
+  }
+
   double get _animatedWaterLevel => _waterLevelTween.transform(Curves.easeOut.transform(_waterCtrl.value));
 
   void _syncWaterAnimation({required bool animate, required double targetProgress}) {
@@ -480,6 +488,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final progress = _computeProgress();
+    final rawProgress = _computeRawProgress();
+    final percentValue = (rawProgress * 100).round();
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
 
@@ -513,6 +523,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             width: _glassSize,
                             height: _glassSize,
                             child: Stack(
+                              alignment: Alignment.center,
                               fit: StackFit.expand,
                               children: [
                                 GlassGauge(
@@ -531,6 +542,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 IgnorePointer(
                                   child: CustomPaint(
                                     painter: _GlassOutlinePainter(),
+                                  ),
+                                ),
+                                IgnorePointer(
+                                  child: Text(
+                                    '$percentValue%',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: _glassSize * 0.16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white.withValues(alpha: 0.95),
+                                      shadows: const [
+                                        Shadow(
+                                          offset: Offset(0, 2),
+                                          blurRadius: 6,
+                                          color: Color(0x33000000),
+                                        ),
+                                        Shadow(
+                                          offset: Offset(0, 0),
+                                          blurRadius: 2,
+                                          color: Color(0x22000000),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
