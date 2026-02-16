@@ -34,11 +34,14 @@ class GlassGauge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gaugeSize = Size.square(size);
+    final clampedProgress = progress.clamp(0.0, 1.0);
+    final percentageLabel = '${(clampedProgress * 100).round()}%';
 
     return SizedBox(
       width: size,
       height: size,
       child: Stack(
+        alignment: Alignment.center,
         fit: StackFit.expand,
         children: [
           CustomPaint(
@@ -53,6 +56,29 @@ class GlassGauge extends StatelessWidget {
               progress: progress,
               rippleT: rippleT,
               extraRippleLayer: extraRippleLayer,
+            ),
+          ),
+          IgnorePointer(
+            child: Text(
+              percentageLabel,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: size * 0.16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withValues(alpha: 0.95),
+                shadows: const [
+                  Shadow(
+                    offset: Offset(0, 2),
+                    blurRadius: 6,
+                    color: Colors.black26,
+                  ),
+                  Shadow(
+                    offset: Offset(0, 0),
+                    blurRadius: 2,
+                    color: Colors.black12,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
