@@ -14,7 +14,6 @@ import '../widgets/drop_shot_overlay.dart';
 import '../widgets/overlays/soap_bubbles_overlay.dart';
 import '../widgets/droplet_button.dart';
 import '../widgets/glass_gauge.dart';
-import '../widgets/painters/glass_fallback_ring_painter.dart';
 import '../widgets/painters/water_fill_painter.dart';
 import '../widgets/ripple_screen_overlay.dart';
 import 'history_screen.dart';
@@ -487,11 +486,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final progress = _computeProgress();
     final rawProgress = _computeRawProgress();
+    final visualProgress = rawProgress.clamp(0.0, 1.0);
     final percentValue = (rawProgress * 100).round();
+    final glassSize = _glassSize;
     final pressScale = Tween<double>(begin: 1, end: 0.96).animate(_pressCtrl).value;
     final holdScale = _isHolding ? (0.9 + _holdLevel * 0.05) : 1.0;
+
+    Widget buildGlassArea() {
+      return SizedBox(
+        width: glassSize,
+        height: glassSize,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GlassGauge(
+              progress: visualProgress,
+              rippleT: _rippleCtrl.value,
+              dropT: 0,
+              size: glassSize,
+            ),
+            IgnorePointer(
+              child: Text(
+                '$percentValue%',
+                style: TextStyle(
+                  fontSize: glassSize * 0.18,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFFFFFFF),
+                  shadows: const [
+                    Shadow(offset: Offset(0, 2), blurRadius: 8, color: Color(0x33000000)),
+                    Shadow(offset: Offset(0, 0), blurRadius: 2, color: Color(0x22000000)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       body: Stack(
@@ -507,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   key: _stackKey,
                   clipBehavior: Clip.none,
                   children: [
-                if (progress >= 1.0)
+                if (visualProgress >= 1.0)
                   const Positioned.fill(
                     child: IgnorePointer(
                       child: SoapBubblesOverlay(),
@@ -519,57 +551,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         builder: (_, __) => GestureDetector(
                           key: _glassKey,
                           onLongPress: _resetTodayTotal,
-                          child: SizedBox(
-                            width: _glassSize,
-                            height: _glassSize,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              fit: StackFit.expand,
-                              children: [
-                                GlassGauge(
-                                  progress: _animatedWaterLevel,
-                                  rippleT: _rippleCtrl.value,
-                                  dropT: 0,
-                                  size: _glassSize,
-                                ),
-                                Image.asset(
-                                  'assets/images/glass_empty.png',
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) => CustomPaint(
-                                    painter: const GlassFallbackRingPainter(),
-                                  ),
-                                ),
-                                IgnorePointer(
-                                  child: CustomPaint(
-                                    painter: _GlassOutlinePainter(),
-                                  ),
-                                ),
-                                IgnorePointer(
-                                  child: Text(
-                                    '$percentValue%',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: _glassSize * 0.16,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white.withValues(alpha: 0.95),
-                                      shadows: const [
-                                        Shadow(
-                                          offset: Offset(0, 2),
-                                          blurRadius: 6,
-                                          color: Color(0x33000000),
-                                        ),
-                                        Shadow(
-                                          offset: Offset(0, 0),
-                                          blurRadius: 2,
-                                          color: Color(0x22000000),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          child: buildGlassArea(),
                         ),
                       ),
                     ),
@@ -686,25 +668,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-class _GlassOutlinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final outlineRect = Rect.fromCircle(
-      center: size.center(Offset.zero),
-      radius: size.width * 0.39,
-    );
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.9
-      ..color = Colors.white.withValues(alpha: 0.28);
-    canvas.drawOval(outlineRect, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _GlassOutlinePainter oldDelegate) {
-    return false;
-  }
-}
 
 class _GlassWaterMetrics {
   const _GlassWaterMetrics({
