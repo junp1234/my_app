@@ -41,6 +41,12 @@ class DropletButton extends StatelessWidget {
               height: 56,
               fit: BoxFit.contain,
               semanticLabel: 'Add water',
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.water_drop,
+                size: 56,
+                color: Colors.lightBlue,
+                semanticLabel: 'Add water',
+              ),
             ),
           ),
         ),
