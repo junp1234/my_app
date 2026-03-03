@@ -299,9 +299,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     final center = glassRect.center;
-    final bowlRadius = glassRect.width * 0.39;
+    final bowlRadius = glassRect.width * GlassGauge.bowlRadiusFactor;
     final outerRect = Rect.fromCircle(center: center, radius: bowlRadius);
-    final innerRect = outerRect.deflate(11);
+    final innerRect = outerRect.deflate(GlassGauge.innerDeflate);
     final waterTopY = WaterFillPainter.waterTopYForProgress(innerRect, progress);
     final waterPath = WaterFillPainter.waterPathForProgress(innerRect, progress);
 

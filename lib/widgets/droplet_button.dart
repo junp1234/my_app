@@ -17,6 +17,8 @@ class DropletButton extends StatelessWidget {
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
 
+  static const double _dropletSize = 84;
+
   @override
   Widget build(BuildContext context) {
     final effectiveScale = isPressed ? 0.96 : scale;
@@ -35,16 +37,16 @@ class DropletButton extends StatelessWidget {
             },
             borderRadius: BorderRadius.circular(999),
             child: Padding(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               child: Image.asset(
                 'assets/images/water.png',
-                width: 56,
-                height: 56,
+                width: _dropletSize,
+                height: _dropletSize,
                 fit: BoxFit.contain,
                 semanticLabel: 'Add water',
                 errorBuilder: (context, error, stackTrace) => const Icon(
                   Icons.water_drop,
-                  size: 56,
+                  size: _dropletSize,
                   color: Colors.lightBlue,
                   semanticLabel: 'Add water',
                 ),
