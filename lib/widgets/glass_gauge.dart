@@ -57,11 +57,14 @@ class GlassGauge extends StatelessWidget {
             ),
           ),
           Positioned.fill(
-            child: Image.asset(
-              'assets/images/bowl.png',
-              fit: BoxFit.contain,
-              semanticLabel: 'Water bowl',
-              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+            child: Transform.scale(
+              scale: 1.12,
+              child: Image.asset(
+                'assets/images/bowl.png',
+                fit: BoxFit.contain,
+                semanticLabel: 'Water bowl',
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+              ),
             ),
           ),
         ],
