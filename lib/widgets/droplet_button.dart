@@ -25,27 +25,29 @@ class DropletButton extends StatelessWidget {
       scale: effectiveScale,
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onTap();
-          },
+        child: GestureDetector(
           onLongPressStart: onLongPressStart,
           onLongPressEnd: onLongPressEnd,
-          borderRadius: BorderRadius.circular(999),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Image.asset(
-              'assets/images/water.png',
-              width: 56,
-              height: 56,
-              fit: BoxFit.contain,
-              semanticLabel: 'Add water',
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.water_drop,
-                size: 56,
-                color: Colors.lightBlue,
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onTap();
+            },
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Image.asset(
+                'assets/images/water.png',
+                width: 56,
+                height: 56,
+                fit: BoxFit.contain,
                 semanticLabel: 'Add water',
+                errorBuilder: (context, error, stackTrace) => const Icon(
+                  Icons.water_drop,
+                  size: 56,
+                  color: Colors.lightBlue,
+                  semanticLabel: 'Add water',
+                ),
               ),
             ),
           ),
