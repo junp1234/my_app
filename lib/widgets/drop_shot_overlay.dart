@@ -32,7 +32,7 @@ class DropShotOverlay extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        const dropletSize = 12.0;
+        const dropletSize = 20.0;
         const dropletHeightMultiplier = 1.25;
         return Stack(
           clipBehavior: Clip.none,
@@ -56,11 +56,17 @@ class _DropTear extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Image.asset(
+      'assets/images/water.png',
       width: size,
       height: size * 1.25,
-      child: CustomPaint(
-        painter: _DropTearPainter(size: size),
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) => SizedBox(
+        width: size,
+        height: size * 1.25,
+        child: CustomPaint(
+          painter: _DropTearPainter(size: size),
+        ),
       ),
     );
   }
