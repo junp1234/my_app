@@ -19,7 +19,7 @@ class GlassGauge extends StatelessWidget {
   final bool extraRippleLayer;
   final double size;
 
-  static const double bowlRadiusFactor = 0.31;
+  static const double bowlRadiusFactor = 0.39;
   static const double innerDeflate = 11;
 
   static Rect outerRectForSize(Size size) {

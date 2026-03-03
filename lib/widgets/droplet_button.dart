@@ -17,7 +17,7 @@ class DropletButton extends StatelessWidget {
   final GestureLongPressStartCallback? onLongPressStart;
   final GestureLongPressEndCallback? onLongPressEnd;
 
-  static const double _dropletSize = 84;
+  static const double _dropletSize = 180;
 
   @override
   Widget build(BuildContext context) {
