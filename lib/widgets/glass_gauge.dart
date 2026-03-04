@@ -21,6 +21,7 @@ class GlassGauge extends StatelessWidget {
 
   static const double bowlRadiusFactor = 0.39;
   static const double innerDeflate = 11;
+  static const double bowlImageScaleFactor = 1.16;
 
   static Rect outerRectForSize(Size size) {
     final center = size.center(Offset.zero);
@@ -41,6 +42,7 @@ class GlassGauge extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         fit: StackFit.expand,
+        clipBehavior: Clip.none,
         children: [
           CustomPaint(
             size: gaugeSize,
@@ -56,12 +58,15 @@ class GlassGauge extends StatelessWidget {
               extraRippleLayer: extraRippleLayer,
             ),
           ),
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/bowl.png',
-              fit: BoxFit.contain,
-              semanticLabel: 'Water bowl',
-              errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+          Center(
+            child: SizedBox.square(
+              dimension: size * bowlImageScaleFactor,
+              child: Image.asset(
+                'assets/images/bowl.png',
+                fit: BoxFit.contain,
+                semanticLabel: 'Water bowl',
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+              ),
             ),
           ),
         ],
